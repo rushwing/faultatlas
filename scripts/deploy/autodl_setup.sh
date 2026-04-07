@@ -57,9 +57,9 @@ fi
 GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -1)
 GPU_VRAM=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader | head -1)
 info "GPU: ${GPU_NAME} (${GPU_VRAM})"
-nvidia-smi --query-gpu=name,memory.total,driver_version,cuda_version \
-  --format=csv,noheader | while IFS=, read -r name mem drv cuda; do
-  info "  Driver: $drv | CUDA: $cuda"
+nvidia-smi --query-gpu=name,memory.total,driver_version \
+  --format=csv,noheader | while IFS=, read -r name mem drv; do
+  info "  Driver: $drv"
 done
 
 # Check VRAM is at least 20GB (Qwen2.5-7B needs ~16GB bf16 + KV cache headroom)
