@@ -1,16 +1,11 @@
-import asyncio
 import logging
 import signal
 import sys
+import time
 
-from faultatlas.kafka.consumer import KafkaConsumer
-from faultatlas.kafka.producer import KafkaProducer
-from faultatlas.kafka.topics import Topics
-from faultatlas.mongo.client import close_client, get_database
-from faultatlas.redis.client import get_redis
+from faultatlas.mongo.client import close_client
 
 from .config import get_settings
-from .consumers.document_upload import handle_document_uploaded
 
 logging.basicConfig(
     stream=sys.stdout,
@@ -20,35 +15,30 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-async def run() -> None:
+def run() -> None:
     settings = get_settings()
-    db = get_database(settings.mongo_uri, settings.mongo_db)
-    redis = get_redis(settings.redis_url)
-    producer = KafkaProducer(settings.kafka_bootstrap_servers)
-
-    def handler(topic: str, payload: dict) -> None:
-        if topic == Topics.DOCUMENTS_UPLOADED:
-            asyncio.get_event_loop().run_until_complete(
-                handle_document_uploaded(payload, db, redis, producer, settings)
-            )
-
-    consumer = KafkaConsumer(
-        bootstrap_servers=settings.kafka_bootstrap_servers,
-        group_id=settings.kafka_consumer_group,
-        topics=[Topics.DOCUMENTS_UPLOADED],
-    )
+    shutdown_requested = False
 
     def shutdown(sig, frame):
+        nonlocal shutdown_requested
         logger.info("shutting down ingestion worker")
-        consumer.stop()
+        shutdown_requested = True
 
     signal.signal(signal.SIGTERM, shutdown)
     signal.signal(signal.SIGINT, shutdown)
 
-    logger.info("ingestion worker started")
-    consumer.run(handler)
-    await close_client()
+    logger.info(
+        "ingestion worker is a Phase 2 stub in the current MVP",
+        extra={"phase": "phase-1", "mode": settings.app_env},
+    )
+    try:
+        while not shutdown_requested:
+            time.sleep(1)
+    finally:
+        import asyncio
+
+        asyncio.run(close_client())
 
 
 if __name__ == "__main__":
-    asyncio.run(run())
+    run()

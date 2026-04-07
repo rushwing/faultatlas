@@ -1,12 +1,10 @@
 import logging
-import uuid
 
 from fastapi import APIRouter
-from faultatlas.mongo.client import Collections
 from pydantic import BaseModel
 
-from ..agents.orchestrator import run_agent
 from ..dependencies import AuthDep, DBDep, RedisDep, SettingsDep
+from .diagnose import DiagnosisRequest, diagnose
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -32,31 +30,17 @@ async def query(
     redis: RedisDep,
     settings: SettingsDep,
 ) -> QueryResponse:
-    session_id = str(uuid.uuid4())
-    logger.info("agent query started", extra={"session_id": session_id, "user_id": request.user_id})
-
-    result = await run_agent(
-        query=request.query,
-        session_id=session_id,
-        settings=settings,
-        redis=redis,
+    logger.warning("/query is deprecated; use /diagnose instead")
+    diagnosis = await diagnose(
+        DiagnosisRequest(query=request.query, user_id=request.user_id),
+        _,
+        db,
+        redis,
+        settings,
     )
-
-    # Persist session
-    await db[Collections.AGENT_SESSIONS].insert_one(
-        {
-            "_id": session_id,
-            "user_id": request.user_id,
-            "query": request.query,
-            "answer": result["answer"],
-            "sources": result["sources"],
-            "tokens_used": result["tokens_used"],
-        }
-    )
-
     return QueryResponse(
-        session_id=session_id,
-        answer=result["answer"],
-        sources=result["sources"],
-        tokens_used=result["tokens_used"],
+        session_id=diagnosis.session_id,
+        answer=diagnosis.summary,
+        sources=sorted({item.document_id for item in diagnosis.evidence}),
+        tokens_used=diagnosis.tokens_used,
     )

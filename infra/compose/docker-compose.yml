@@ -74,8 +74,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      kafka:
-        condition: service_healthy
     restart: unless-stopped
 
   ingestion:
@@ -87,8 +85,6 @@ services:
       mongo:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      kafka:
         condition: service_healthy
     restart: unless-stopped
 

@@ -1,0 +1,31 @@
+name: Deploy Phase 1
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_eval_smoke:
+        description: "Run eval-smoke after deployment"
+        required: false
+        default: "false"
+
+jobs:
+  deploy:
+    name: Remote Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd "${{ secrets.DEPLOY_PATH }}"
+            git fetch --all --prune
+            git checkout "${{ github.sha }}"
+            docker compose -f infra/compose/docker-compose.yml up -d --build mongo redis api retriever
+            API_BASE=http://127.0.0.1:8000 API_KEY="${{ secrets.DEPLOY_API_KEY }}" ./scripts/smoke_test.sh
+            if [ "${{ github.event.inputs.run_eval_smoke }}" = "true" ]; then
+              API_BASE=http://127.0.0.1:8000 API_KEY="${{ secrets.DEPLOY_API_KEY }}" make eval-smoke
+            fi

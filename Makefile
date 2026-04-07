@@ -150,9 +150,9 @@ benchmark:  ## Run prefix caching benchmark
 eval: eval-rag eval-agent eval-prompt  ## Run full eval suite (all 3 dimensions)
 
 .PHONY: eval-smoke
-eval-smoke:  ## Fast subset eval (3 queries, ~2 min)
-	uv run --package faultatlas-harness python harness/evals/rag/eval_retrieval.py --smoke
-	uv run --package faultatlas-harness python harness/evals/agent/eval_diagnosis.py --smoke
+eval-smoke:  ## Fast PR-safe smoke eval (diagnose schema + prompt stability)
+	uv run --package faultatlas-harness python harness/evals/smoke/eval_diagnose_smoke.py
+	uv run --package faultatlas-harness python harness/evals/smoke/eval_prompt_smoke.py
 
 .PHONY: eval-rag
 eval-rag:  ## RAG quality eval (faithfulness, context precision, recall, answer relevance)
