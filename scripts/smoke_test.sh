@@ -15,10 +15,12 @@ echo -n "[2] Readiness check... "
 curl -sf "$BASE/ready" -H "$H" | grep -q '"ok"' && echo "PASS" || { echo "FAIL"; exit 1; }
 
 TMP_DOC=$(mktemp)
-cat > "$TMP_DOC" <<'EOF'
+# Include a unique run ID so repeated smoke test runs don't hit the 409 idempotency check
+cat > "$TMP_DOC" <<EOF
 2024-01-15T02:13:44Z WARN  kernel: Out of memory: Kill process 1234 (java) score 900
 2024-01-15T02:13:44Z ERROR java.lang.OutOfMemoryError: Java heap space
 2024-01-15T02:13:44Z FATAL payment-processor crashed. Restarting in 5s.
+smoke-test-run-id: $(date +%s)-$$
 EOF
 
 echo -n "[3] Upload document... "
