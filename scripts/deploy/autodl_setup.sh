@@ -325,6 +325,17 @@ else
   info "Updated .env: MONGO_URI and REDIS_URL → localhost"
 fi
 
+# ninja — required by flashinfer JIT kernel compilation at SGLang startup
+if ! command -v ninja &>/dev/null; then
+  info "Installing ninja (required by flashinfer)..."
+  apt-get install -y ninja-build
+  # Ubuntu installs as 'ninja-build'; flashinfer subprocess calls 'ninja'
+  ln -sf /usr/bin/ninja-build /usr/local/bin/ninja
+  info "ninja installed: $(ninja --version)"
+else
+  info "ninja: $(ninja --version)"
+fi
+
 # =============================================================================
 section "Step 6 — Start SGLang model server"
 # =============================================================================
