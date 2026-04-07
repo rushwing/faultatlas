@@ -6,7 +6,9 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 from faultatlas.ingestion import ingest_document
 from faultatlas.mongo.client import Collections
 from faultatlas.redis.client import RedisKeys
+from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel
+from redis.asyncio import Redis
 
 from ..dependencies import AuthDep, DBDep, RedisDep, SettingsDep
 
@@ -15,8 +17,8 @@ router = APIRouter()
 
 
 async def _clear_idempotency_if_not_persisted(
-    db: DBDep,
-    redis: RedisDep,
+    db: AsyncIOMotorDatabase,
+    redis: Redis,
     *,
     idempotency_key: str,
     document_id: str,
@@ -84,7 +86,7 @@ async def upload_document(
             document_id=document_id,
         )
         if str(exc) == "encrypted_pdf":
-            raise HTTPException(status_code=500, detail="Document processing failed") from exc
+            raise HTTPException(status_code=422, detail="encrypted_pdf") from exc
         raise
     except RuntimeError as exc:
         await _clear_idempotency_if_not_persisted(
