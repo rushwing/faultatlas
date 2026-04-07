@@ -16,7 +16,9 @@ def main() -> int:
             f"{API_BASE}/diagnose",
             json={"query": "Why is payment-processor failing with Java heap space errors?"},
         )
-        response.raise_for_status()
+        if response.status_code >= 400:
+            print(f"diagnose request failed: {response.status_code} {response.text}")
+            return 1
         data = response.json()
 
     required = {

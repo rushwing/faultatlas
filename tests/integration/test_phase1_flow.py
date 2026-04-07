@@ -38,6 +38,10 @@ async def test_phase1_flow() -> None:
             f"{API_BASE}/diagnose",
             json={"query": "Why is payment-processor failing with Java heap space errors?"},
         )
+        if empty_diag.status_code != 200:
+            pytest.fail(
+                f"/diagnose failed before upload: {empty_diag.status_code} {empty_diag.text}"
+            )
         assert empty_diag.status_code == 200
         assert empty_diag.json()["confidence"] == "low"
 
@@ -68,6 +72,10 @@ async def test_phase1_flow() -> None:
             f"{API_BASE}/diagnose",
             json={"query": "Why is payment-processor failing with Java heap space errors?"},
         )
+        if diagnose.status_code != 200:
+            pytest.fail(
+                f"/diagnose failed after upload: {diagnose.status_code} {diagnose.text}"
+            )
         assert diagnose.status_code == 200
         diagnosis = diagnose.json()
         assert diagnosis["summary"]

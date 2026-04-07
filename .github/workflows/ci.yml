@@ -105,6 +105,12 @@ jobs:
           API_BASE: http://127.0.0.1:8000
           API_KEY: changeme-local-dev
         run: uv run pytest tests/integration -m integration -v
+      - name: Dump integration service logs on failure
+        if: failure()
+        run: |
+          cat /tmp/fake-sglang.log || true
+          cat /tmp/retriever.log || true
+          cat /tmp/api.log || true
 
   eval-smoke:
     name: Eval Smoke
@@ -162,3 +168,9 @@ jobs:
           API_BASE: http://127.0.0.1:8000
           API_KEY: changeme-local-dev
         run: make eval-smoke
+      - name: Dump eval smoke service logs on failure
+        if: failure()
+        run: |
+          cat /tmp/fake-sglang.log || true
+          cat /tmp/retriever.log || true
+          cat /tmp/api.log || true
