@@ -144,6 +144,14 @@ else
   echo "$CURRENT_LOCK_HASH" > "$LOCK_HASH_FILE"
 fi
 
+# SGLang — GPU-only dep, not in pyproject.toml, install separately
+if ! uv run python -c "import sglang" &>/dev/null; then
+  info "Installing SGLang (GPU-only, not in workspace deps)..."
+  uv pip install "sglang[all]"
+else
+  info "SGLang: already installed"
+fi
+
 # =============================================================================
 section "Step 3 — Configure environment"
 # =============================================================================
