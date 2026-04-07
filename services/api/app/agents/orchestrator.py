@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 
@@ -6,7 +7,7 @@ from redis.asyncio import Redis
 
 from ..config import Settings
 from ..llm import get_llm_client
-from ..llm.errors import LLMOutputParseError
+from ..llm.errors import LLMBackendUnavailableError, LLMOutputParseError
 from ..schemas.diagnosis import DiagnosisEvidenceItem, DiagnosisResponse
 from .prompt_builder import PromptBundle, build_diagnosis_prompt
 from .prompts import REPAIR_PROMPT
@@ -14,6 +15,28 @@ from .response_parser import parse_diagnosis_output
 from .tools import retrieve_context
 
 logger = logging.getLogger(__name__)
+
+
+async def _complete_with_retry(
+    llm_client,
+    messages: list[dict[str, str]],
+    *,
+    max_tokens: int,
+    temperature: float,
+):
+    delay_seconds = 0.25
+    for attempt in range(3):
+        try:
+            return await llm_client.complete(
+                messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
+            )
+        except LLMBackendUnavailableError:
+            if attempt == 2:
+                raise
+            await asyncio.sleep(delay_seconds)
+            delay_seconds *= 2
 
 
 def _build_evidence(
@@ -36,7 +59,8 @@ async def _run_llm_with_repair(
     prompt_bundle: PromptBundle,
 ) -> tuple[DiagnosisResponse | None, dict]:
     llm_client = get_llm_client(settings)
-    llm_response = await llm_client.complete(
+    llm_response = await _complete_with_retry(
+        llm_client,
         prompt_bundle.messages,
         max_tokens=800,
         temperature=0.1,
@@ -52,7 +76,8 @@ async def _run_llm_with_repair(
                 "content": REPAIR_PROMPT.format(bad_output=llm_response.content),
             },
         ]
-        repair_response = await llm_client.complete(
+        repair_response = await _complete_with_retry(
+            llm_client,
             repair_messages,
             max_tokens=800,
             temperature=0.0,
