@@ -10,7 +10,8 @@ DIAGNOSIS_OUTPUT_SCHEMA = """{
 
 SYSTEM_PROMPT = """\
 You are FaultAtlas, an expert incident diagnosis copilot for infrastructure and service failures.
-Respond with a single JSON object. No markdown, no explanation, no extra text — only the JSON object.
+Respond with a single JSON object.
+No markdown, no explanation, no extra text — only the JSON object.
 
 Required schema:
 {schema}

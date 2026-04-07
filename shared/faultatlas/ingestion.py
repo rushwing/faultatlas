@@ -143,13 +143,23 @@ async def ingest_document(
 
         text, source_metadata = extract_text(content, content_type)
         chunks = chunk_text(text, chunk_size, chunk_overlap)
-        chunk_ids = await save_chunks(db, document_id, chunks, embedding_model)
+
+        # Resolve the model name that will actually be stored in chunk records.
+        # When local embeddings are active the real model is LOCAL_EMBEDDING_MODEL,
+        # not the OpenAI model name passed in from config.
+        from .embeddings import LOCAL_EMBEDDING_MODEL
+
+        if should_use_local_embeddings(openai_api_key):
+            effective_model = LOCAL_EMBEDDING_MODEL
+        else:
+            effective_model = embedding_model
+        chunk_ids = await save_chunks(db, document_id, chunks, effective_model)
 
         await redis.setex(RedisKeys.doc_status(document_id), 3600, "embedding")
         await update_document_fields(db, document_id, {"status": "embedding"})
 
         embeddings = await embed_chunks(chunks, embedding_model, openai_api_key)
-        await upsert_embeddings(db, chunk_ids, embeddings, embedding_model)
+        await upsert_embeddings(db, chunk_ids, embeddings, effective_model)
 
         await redis.setex(RedisKeys.doc_status(document_id), 3600, "indexed")
         await update_document_fields(
