@@ -27,6 +27,10 @@ select = ["E", "F", "I", "UP"]
 asyncio_mode = "auto"
 addopts = "--import-mode=importlib"
 testpaths = ["tests", "services/api/tests", "services/ingestion/tests", "services/retriever/tests"]
+markers = [
+    "integration: requires live backing services",
+    "requires_gpu: requires a GPU-backed model server",
+]
 
 [tool.mypy]
 explicit_package_bases = true

@@ -53,3 +53,124 @@ jobs:
           name: coverage-report
           path: htmlcov/
           if-no-files-found: ignore
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+      - name: Install dependencies
+        run: uv sync --all-packages --dev
+      - name: Start fake SGLang and app services
+        env:
+          API_KEY: changeme-local-dev
+          OPENAI_API_KEY: test-key
+          LLM_BACKEND: sglang
+          SGLANG_BASE_URL: http://127.0.0.1:8100/v1
+          MODEL_NAME: fake/sglang
+          MONGO_URI: mongodb://127.0.0.1:27017
+          REDIS_URL: redis://127.0.0.1:6379/0
+          RETRIEVER_URL: http://127.0.0.1:8001
+        run: |
+          nohup uv run python tests/fake_sglang_server.py >/tmp/fake-sglang.log 2>&1 &
+          nohup uv run --package faultatlas-retriever uvicorn app.main:app --app-dir services/retriever --host 127.0.0.1 --port 8001 >/tmp/retriever.log 2>&1 &
+          nohup uv run --package faultatlas-api uvicorn app.main:app --app-dir services/api --host 127.0.0.1 --port 8000 >/tmp/api.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:8100/health >/dev/null \
+              && curl -sf http://127.0.0.1:8001/health >/dev/null \
+              && curl -sf -H "X-API-Key: $API_KEY" http://127.0.0.1:8000/ready >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "API, retriever, or fake SGLang failed to become ready"
+          cat /tmp/fake-sglang.log || true
+          cat /tmp/retriever.log || true
+          cat /tmp/api.log || true
+          exit 1
+      - name: Run integration tests
+        env:
+          API_BASE: http://127.0.0.1:8000
+          API_KEY: changeme-local-dev
+        run: uv run pytest tests/integration -m integration -v
+      - name: Dump integration service logs on failure
+        if: failure()
+        run: |
+          cat /tmp/fake-sglang.log || true
+          cat /tmp/retriever.log || true
+          cat /tmp/api.log || true
+
+  eval-smoke:
+    name: Eval Smoke
+    runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+      - name: Install dependencies
+        run: uv sync --all-packages --dev
+      - name: Start fake SGLang and app services
+        env:
+          API_KEY: changeme-local-dev
+          OPENAI_API_KEY: test-key
+          LLM_BACKEND: sglang
+          SGLANG_BASE_URL: http://127.0.0.1:8100/v1
+          MODEL_NAME: fake/sglang
+          MONGO_URI: mongodb://127.0.0.1:27017
+          REDIS_URL: redis://127.0.0.1:6379/0
+          RETRIEVER_URL: http://127.0.0.1:8001
+        run: |
+          nohup uv run python tests/fake_sglang_server.py >/tmp/fake-sglang.log 2>&1 &
+          nohup uv run --package faultatlas-retriever uvicorn app.main:app --app-dir services/retriever --host 127.0.0.1 --port 8001 >/tmp/retriever.log 2>&1 &
+          nohup uv run --package faultatlas-api uvicorn app.main:app --app-dir services/api --host 127.0.0.1 --port 8000 >/tmp/api.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:8100/health >/dev/null \
+              && curl -sf http://127.0.0.1:8001/health >/dev/null \
+              && curl -sf -H "X-API-Key: $API_KEY" http://127.0.0.1:8000/ready >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "API, retriever, or fake SGLang failed to become ready"
+          cat /tmp/fake-sglang.log || true
+          cat /tmp/retriever.log || true
+          cat /tmp/api.log || true
+          exit 1
+      - name: Seed smoke document
+        env:
+          API_BASE: http://127.0.0.1:8000
+          API_KEY: changeme-local-dev
+        run: uv run python scripts/seed_data.py
+      - name: Run eval smoke
+        env:
+          API_BASE: http://127.0.0.1:8000
+          API_KEY: changeme-local-dev
+        run: make eval-smoke
+      - name: Dump eval smoke service logs on failure
+        if: failure()
+        run: |
+          cat /tmp/fake-sglang.log || true
+          cat /tmp/retriever.log || true
+          cat /tmp/api.log || true

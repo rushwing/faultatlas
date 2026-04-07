@@ -41,3 +41,11 @@ async def update_document_status(db: AsyncIOMotorDatabase, document_id: str, sta
         {"_id": document_id},
         {"$set": {"status": status}},
     )
+
+
+async def update_document_fields(
+    db: AsyncIOMotorDatabase,
+    document_id: str,
+    fields: dict,
+) -> None:
+    await db[Collections.DOCUMENTS].update_one({"_id": document_id}, {"$set": fields})

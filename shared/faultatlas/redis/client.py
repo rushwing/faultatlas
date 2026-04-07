@@ -11,6 +11,10 @@ class RedisKeys:
         return f"retriever:query_cache:{query_hash}"
 
     @staticmethod
+    def benchmark_run(run_id: str) -> str:
+        return f"benchmark:run:{run_id}"
+
+    @staticmethod
     def rate_limit(user_id: str, bucket: str) -> str:
         return f"api:ratelimit:{user_id}:{bucket}"
 

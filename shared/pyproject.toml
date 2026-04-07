@@ -9,6 +9,9 @@ dependencies = [
     "motor>=3.4",          # async MongoDB
     "redis[hiredis]>=5.0",
     "confluent-kafka>=2.4",
+    "openai>=1.30",
+    "langchain-text-splitters>=0.2",
+    "pypdf>=4.0",
 ]
 
 [build-system]

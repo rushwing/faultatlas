@@ -4,8 +4,9 @@ from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 class Collections:
     DOCUMENTS = "documents"
     CHUNKS = "chunks"
-    EMBEDDINGS = "embeddings"
     INCIDENTS = "incidents"
+    CITATIONS = "citations"
+    BENCHMARK_RUNS = "benchmark_runs"
     AGENT_SESSIONS = "agent_sessions"
     AUDIT_LOG = "audit_log"
 

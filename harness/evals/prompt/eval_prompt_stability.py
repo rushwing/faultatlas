@@ -111,6 +111,20 @@ async def run_stability_check(runs: int = 20) -> dict:
 def compare_to_baseline(current_scores: dict, baseline_path: Path) -> dict:
     """Compare current faithfulness score to saved baseline."""
     baseline = json.loads(baseline_path.read_text())
+    if baseline.get("placeholder") is True:
+        return {
+            "baseline_faithfulness": baseline.get("faithfulness"),
+            "current_faithfulness": current_scores.get("faithfulness", 0.0),
+            "delta": None,
+            "threshold": None,
+            "passed": True,
+            "skipped": True,
+            "verdict": (
+                "Baseline is marked as placeholder; skipping prompt regression comparison "
+                "until a real baseline is generated."
+            ),
+        }
+
     baseline_faithfulness = baseline.get("faithfulness", 0.0)
     current_faithfulness = current_scores.get("faithfulness", 0.0)
     delta = current_faithfulness - baseline_faithfulness
@@ -172,7 +186,7 @@ def run_eval(mode: str, baseline_path: str | None = None, version: str = "v1") -
 
         print("\n── Prompt Regression Results ─────────────────────────────")
         print(f"  {comparison['verdict']}")
-        print("  ['PASS' if comparison['passed'] else 'FAIL']")
+        print(f"  {'PASS' if comparison['passed'] else 'FAIL'}")
         print("──────────────────────────────────────────────────────────")
 
         report.update(comparison)

@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
 from .middleware.logging import setup_logging
-from .routers import health, incidents, ingest, query
+from .routers import benchmark, diagnose, health, incidents, ingest, query
 
 settings = get_settings()
 setup_logging(settings.log_level)
@@ -29,7 +29,10 @@ app.add_middleware(
 
 app.include_router(health.router, tags=["health"])
 app.include_router(ingest.router, prefix="/documents", tags=["ingestion"])
+app.include_router(diagnose.router, prefix="/diagnose", tags=["diagnosis"])
+app.include_router(diagnose.debug_router, tags=["debug"])
 app.include_router(query.router, prefix="/query", tags=["query"])
+app.include_router(benchmark.router, prefix="/benchmark", tags=["benchmark"])
 app.include_router(incidents.router, prefix="/incidents", tags=["incidents"])
 
 
