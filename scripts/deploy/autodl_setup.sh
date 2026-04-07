@@ -130,8 +130,12 @@ else
 fi
 
 # Python deps for model download + SGLang
-info "Installing Python workspace dependencies..."
-uv sync --all-packages
+if [[ -d "${REPO_ROOT}/.venv" ]]; then
+  info "Python virtualenv already exists — skipping uv sync"
+else
+  info "Installing Python workspace dependencies..."
+  uv sync --all-packages
+fi
 
 # =============================================================================
 section "Step 3 — Configure environment"
