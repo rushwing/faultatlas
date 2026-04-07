@@ -44,9 +44,7 @@ async def vector_search(
     chunk_filter = {"embedding": {"$exists": True}, "embedding_model": active_model}
     existing_chunk = await db["chunks"].find_one(chunk_filter, {"_id": 1})
     if existing_chunk is None:
-        logger.debug(
-            "vector search skipped: no chunks with embedding_model=%s", active_model
-        )
+        logger.debug("vector search skipped: no chunks with embedding_model=%s", active_model)
         return []
 
     cursor = db["chunks"].find(
