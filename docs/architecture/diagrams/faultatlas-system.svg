@@ -1,0 +1,307 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1800" height="1860"
+     viewBox="0 0 1800 1860"
+     role="img"
+     aria-labelledby="arch-title arch-desc">
+  <title id="arch-title">FaultAtlas — System Overview</title>
+  <desc id="arch-desc">Layered system architecture of FaultAtlas: a single-machine RAG copilot for incident diagnosis, showing services, data stores, LLM backends, and external dependencies.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#eef2f7"/>
+    </linearGradient>
+    <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ede9fe"/>
+      <stop offset="100%" stop-color="#c4b5fd"/>
+    </linearGradient>
+    <linearGradient id="portalGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#dbeafe"/>
+      <stop offset="100%" stop-color="#93c5fd"/>
+    </linearGradient>
+    <linearGradient id="agentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#f8fafc"/>
+    </linearGradient>
+    <linearGradient id="runtimeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ede9fe"/>
+      <stop offset="100%" stop-color="#c4b5fd"/>
+    </linearGradient>
+    <linearGradient id="dataGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f0fdf4"/>
+      <stop offset="100%" stop-color="#bbf7d0"/>
+    </linearGradient>
+    <linearGradient id="extGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff7ed"/>
+      <stop offset="100%" stop-color="#fed7aa"/>
+    </linearGradient>
+    <linearGradient id="monitorGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef3c7"/>
+      <stop offset="100%" stop-color="#fde68a"/>
+    </linearGradient>
+    <linearGradient id="repoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ecfeff"/>
+      <stop offset="100%" stop-color="#cffafe"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#0f172a" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#475569"/>
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#3b82f6"/>
+    </marker>
+    <style>
+      .arch-title    { font: 700 32px 'Helvetica Neue', Arial, sans-serif; fill: #0f172a; }
+      .arch-subtitle { font: 500 16px 'Helvetica Neue', Arial, sans-serif; fill: #1e293b; }
+      .arch-meta     { font: 500 14px 'Helvetica Neue', Arial, sans-serif; fill: #334155; }
+      .sec-title     { font: 700 18px 'Helvetica Neue', Arial, sans-serif; fill: #0f172a; letter-spacing: 0.4px; }
+      .sec-caption   { font: 500 13px 'Helvetica Neue', Arial, sans-serif; fill: #334155; }
+      .box-title     { font: 700 20px 'Helvetica Neue', Arial, sans-serif; fill: #0f172a; }
+      .box-body      { font: 500 13px 'Helvetica Neue', Arial, sans-serif; fill: #1e293b; }
+      .box-small     { font: 500 12px 'Helvetica Neue', Arial, sans-serif; fill: #334155; }
+      .mono          { font: 600 12px Menlo, Monaco, Consolas, monospace; fill: #0f172a; }
+      .pill          { font: 700 11px 'Helvetica Neue', Arial, sans-serif; fill: #0f172a; letter-spacing: 0.8px; }
+      .flow-label    { font: 500 12px 'Helvetica Neue', Arial, sans-serif; fill: #475569; }
+      .divider       { stroke: #cbd5e1; stroke-width: 1; stroke-dasharray: 6 6; }
+      .connector     { stroke: #475569; stroke-width: 2.5; fill: none; marker-end: url(#arrow); }
+      .soft-conn     { stroke: #64748b; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+      .data-conn     { stroke: #3b82f6; stroke-width: 2; fill: none; stroke-dasharray: 5 3; marker-end: url(#arrow-blue); }
+      .async-conn    { stroke: #94a3b8; stroke-width: 1.5; fill: none; stroke-dasharray: 6 3; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1800" height="1860" fill="url(#bg)"/>
+
+  <!-- ── Header ── -->
+  <rect x="40" y="28" width="1720" height="92" rx="24" fill="url(#headerGrad)" filter="url(#shadow)"/>
+  <text x="74" y="73"  class="arch-title">FaultAtlas — Architecture</text>
+  <text x="74" y="100" class="arch-subtitle">System Overview · Single-Machine RAG Incident Copilot · Phase 1</text>
+  <text x="1460" y="73"  class="arch-meta">source: ~/Dev/faultatlas</text>
+  <text x="1460" y="100" class="arch-meta">generated: 2026-04-07</text>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       LAYER 1 — ENTRY  (y=168)
+  ══════════════════════════════════════════════════════════════ -->
+  <text x="60" y="178" class="sec-title">1. Access &amp; Entry</text>
+  <text x="60" y="200" class="sec-caption">HTTP gateway — all client traffic enters here; routes to agent, benchmark, ingestion, and query handlers</text>
+
+  <!-- API Service card (1 card = 1680px wide) -->
+  <rect x="60" y="216" width="1680" height="190" rx="22"
+        fill="url(#portalGrad)" stroke="#93c5fd" stroke-width="2" filter="url(#shadow)"/>
+  <text x="900" y="258" text-anchor="middle" class="box-title">API Service  :8000</text>
+  <!-- bullets col 1 -->
+  <text x="88" y="286" class="box-body">• POST /diagnose — RAG agent endpoint</text>
+  <text x="88" y="308" class="box-body">• POST /documents — sync ingestion pipeline</text>
+  <text x="88" y="330" class="box-body">• POST /benchmark/run — TTFT benchmark runner</text>
+  <text x="88" y="352" class="box-body">• POST /query — deprecated alias for /diagnose</text>
+  <!-- bullets col 2 -->
+  <text x="620" y="286" class="box-body">• GET  /incidents — incident records</text>
+  <text x="620" y="308" class="box-body">• GET  /health — liveness probe</text>
+  <text x="620" y="330" class="box-body">• CORS middleware (dev: allow-all)</text>
+  <text x="620" y="352" class="box-body">• Structured JSON logging</text>
+  <!-- bullets col 3 -->
+  <text x="1140" y="286" class="box-body">• Session management via Redis TTL 30m</text>
+  <text x="1140" y="308" class="box-body">• Writes agent_sessions + citations to MongoDB</text>
+  <text x="1140" y="330" class="box-body">• LLM_BACKEND switchable at runtime</text>
+  <text x="1140" y="352" class="box-body">• DiagnosisResponse schema is stable</text>
+  <!-- pills -->
+  <rect x="88" y="374" width="90" height="28" rx="14" fill="#bfdbfe"/>
+  <text x="133" y="393" text-anchor="middle" class="pill">FASTAPI</text>
+  <rect x="188" y="374" width="80" height="28" rx="14" fill="#bfdbfe"/>
+  <text x="228" y="393" text-anchor="middle" class="pill">PORT 8000</text>
+  <rect x="278" y="374" width="80" height="28" rx="14" fill="#bfdbfe"/>
+  <text x="318" y="393" text-anchor="middle" class="pill">PUBLIC</text>
+
+  <!-- ── Arrow: Entry → Agents ── -->
+  <line x1="900" y1="406" x2="900" y2="454" class="connector"/>
+  <text x="910" y="436" class="flow-label">orchestrate</text>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       LAYER 2 — AGENTS  (y=454)
+  ══════════════════════════════════════════════════════════════ -->
+  <line x1="60" y1="450" x2="1740" y2="450" class="divider"/>
+  <text x="60" y="468" class="sec-title">2. Agent &amp; Benchmark Layer</text>
+  <text x="60" y="490" class="sec-caption">Single-step RAG agent and benchmark runner — the core intelligence and measurement logic</text>
+
+  <!-- Card 1: Diagnosis Agent (w=830) -->
+  <rect x="60" y="506" width="830" height="230" rx="22"
+        fill="url(#agentGrad)" stroke="#bfdbfe" stroke-width="2" filter="url(#shadow)"/>
+  <text x="475" y="548" text-anchor="middle" class="box-title">Diagnosis Agent</text>
+  <text x="88" y="576" class="box-body">• retrieve_context() → calls Retriever :8001</text>
+  <text x="88" y="598" class="box-body">• build_diagnosis_prompt() — 3-layer structure</text>
+  <text x="88" y="620" class="box-body">  Layer 1: fixed system prompt (~800 tokens)</text>
+  <text x="88" y="642" class="box-body">  Layer 2: retrieved chunks (deterministic order)</text>
+  <text x="88" y="664" class="box-body">  Layer 3: user query (variable, appended last)</text>
+  <text x="88" y="686" class="box-body">• parse_diagnosis_output() + JSON repair loop</text>
+  <rect x="88" y="704" width="100" height="28" rx="14" fill="#e0e7ff"/>
+  <text x="138" y="723" text-anchor="middle" class="pill">RAG AGENT</text>
+  <rect x="198" y="704" width="110" height="28" rx="14" fill="#e0e7ff"/>
+  <text x="253" y="723" text-anchor="middle" class="pill">CACHE-AWARE</text>
+
+  <!-- Card 2: Benchmark Runner (w=830) -->
+  <rect x="910" y="506" width="830" height="230" rx="22"
+        fill="url(#agentGrad)" stroke="#bfdbfe" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1325" y="548" text-anchor="middle" class="box-title">Benchmark Runner</text>
+  <text x="938" y="576" class="box-body">• cold_start: flush cache → N repeated queries</text>
+  <text x="938" y="598" class="box-body">• shared_prefix: N variants, same Layer 1+2</text>
+  <text x="938" y="620" class="box-body">• no_shared_prefix: N unrelated queries (control)</text>
+  <text x="938" y="642" class="box-body">• summarize_condition() → p50/p95 TTFT, tok/s</text>
+  <text x="938" y="664" class="box-body">• build_hypothesis_result() → pass/fail vs 60%</text>
+  <text x="938" y="686" class="box-body">• Stores results in benchmark_runs collection</text>
+  <rect x="938" y="704" width="110" height="28" rx="14" fill="#e0e7ff"/>
+  <text x="993" y="723" text-anchor="middle" class="pill">BENCHMARK</text>
+  <rect x="1058" y="704" width="100" height="28" rx="14" fill="#e0e7ff"/>
+  <text x="1108" y="723" text-anchor="middle" class="pill">PHASE 1</text>
+
+  <!-- ── Arrows: Agents → Runtime ── -->
+  <line x1="475" y1="736" x2="475" y2="784" class="connector"/>
+  <line x1="1325" y1="736" x2="1325" y2="784" class="connector"/>
+  <text x="485" y="766" class="flow-label">LLM call</text>
+  <text x="1335" y="766" class="flow-label">LLM call</text>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       LAYER 3 — RUNTIME  (y=784)
+  ══════════════════════════════════════════════════════════════ -->
+  <line x1="60" y1="780" x2="1740" y2="780" class="divider"/>
+  <text x="60" y="798" class="sec-title">3. LLM Runtime</text>
+  <text x="60" y="820" class="sec-caption">Switchable LLM backend — SGLang (RadixAttention) for benchmarking, OpenAI for fallback/control</text>
+
+  <!-- Card 1: SGLang Backend (w=830) -->
+  <rect x="60" y="836" width="830" height="200" rx="22"
+        fill="url(#runtimeGrad)" stroke="#a78bfa" stroke-width="2" filter="url(#shadow)"/>
+  <text x="475" y="878" text-anchor="middle" class="box-title">SGLang Backend  (LLM_BACKEND=sglang)</text>
+  <text x="88" y="906" class="box-body">• Qwen2.5-7B-Instruct or Qwen3-8B model</text>
+  <text x="88" y="928" class="box-body">• RadixAttention prefix caching (RTX 4090)</text>
+  <text x="88" y="950" class="box-body">• Returns ttft_ms + prefix_cache_hint per call</text>
+  <text x="88" y="972" class="box-body">• flush_cache() for cold-start benchmark resets</text>
+  <text x="88" y="994" class="box-body">• Target: shared-prefix TTFT ≤ 60% of cold-start</text>
+  <rect x="88" y="1012" width="110" height="28" rx="14" fill="#ddd6fe"/>
+  <text x="143" y="1031" text-anchor="middle" class="pill">SGLANG</text>
+  <rect x="208" y="1012" width="80" height="28" rx="14" fill="#ddd6fe"/>
+  <text x="248" y="1031" text-anchor="middle" class="pill">GPU</text>
+  <rect x="298" y="1012" width="130" height="28" rx="14" fill="#ddd6fe"/>
+  <text x="363" y="1031" text-anchor="middle" class="pill">PREFIX CACHE</text>
+
+  <!-- Card 2: OpenAI Backend (w=830) -->
+  <rect x="910" y="836" width="830" height="200" rx="22"
+        fill="url(#runtimeGrad)" stroke="#a78bfa" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1325" y="878" text-anchor="middle" class="box-title">OpenAI Backend  (LLM_BACKEND=openai)</text>
+  <text x="938" y="906" class="box-body">• OpenAI Chat Completions API</text>
+  <text x="938" y="928" class="box-body">• Control group / fallback when SGLang unavailable</text>
+  <text x="938" y="950" class="box-body">• Same LLMClient protocol interface</text>
+  <text x="938" y="972" class="box-body">• flush_cache() is a no-op (returns false)</text>
+  <text x="938" y="994" class="box-body">• Configurable model via OPENAI_CHAT_MODEL env</text>
+  <rect x="938" y="1012" width="90" height="28" rx="14" fill="#ddd6fe"/>
+  <text x="983" y="1031" text-anchor="middle" class="pill">OPENAI</text>
+  <rect x="1038" y="1012" width="100" height="28" rx="14" fill="#ddd6fe"/>
+  <text x="1088" y="1031" text-anchor="middle" class="pill">FALLBACK</text>
+
+  <!-- ── Arrow: Runtime → Retriever ── -->
+  <path d="M 475,1036 C 475,1070 475,1090 475,1114" class="connector"/>
+  <text x="485" y="1082" class="flow-label">retrieve</text>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       LAYER 4 — RETRIEVER SERVICE  (y=1114)
+  ══════════════════════════════════════════════════════════════ -->
+  <line x1="60" y1="1110" x2="1740" y2="1110" class="divider"/>
+  <text x="60" y="1128" class="sec-title">4. Retrieval Service</text>
+  <text x="60" y="1150" class="sec-caption">Internal vector search service — not public-facing; caches results in Redis, reads embeddings from MongoDB</text>
+
+  <!-- Retriever card (1 card = 1680px) -->
+  <rect x="60" y="1166" width="1680" height="200" rx="22"
+        fill="url(#agentGrad)" stroke="#bfdbfe" stroke-width="2" filter="url(#shadow)"/>
+  <text x="900" y="1208" text-anchor="middle" class="box-title">Retriever Service  :8001  (internal)</text>
+  <!-- col 1 -->
+  <text x="88" y="1236" class="box-body">• POST /search — vector similarity search</text>
+  <text x="88" y="1258" class="box-body">• Redis query cache (TTL 5m) checked first</text>
+  <text x="88" y="1280" class="box-body">• Embed query via OpenAI or local fallback</text>
+  <text x="88" y="1302" class="box-body">• In-memory cosine scan over MongoDB chunks</text>
+  <!-- col 2 -->
+  <text x="620" y="1236" class="box-body">• context_builder.py formats top-k for Layer 2</text>
+  <text x="620" y="1258" class="box-body">• Deterministic chunk ordering (cache-critical)</text>
+  <text x="620" y="1280" class="box-body">• top_k=5 default; configurable</text>
+  <text x="620" y="1302" class="box-body">• GET /health — liveness probe</text>
+  <!-- col 3 -->
+  <text x="1140" y="1236" class="box-body">• Ingestion path: extractor → chunker → embedder</text>
+  <text x="1140" y="1258" class="box-body">• Idempotency key: doc_hash TTL 24h in Redis</text>
+  <text x="1140" y="1280" class="box-body">• Ingestion worker is Phase 1 stub (no Kafka)</text>
+  <text x="1140" y="1302" class="box-body">• Writes documents + chunks to MongoDB</text>
+  <!-- pills -->
+  <rect x="88" y="1334" width="90" height="28" rx="14" fill="#bfdbfe"/>
+  <text x="133" y="1353" text-anchor="middle" class="pill">FASTAPI</text>
+  <rect x="188" y="1334" width="100" height="28" rx="14" fill="#bfdbfe"/>
+  <text x="238" y="1353" text-anchor="middle" class="pill">PORT 8001</text>
+  <rect x="298" y="1334" width="100" height="28" rx="14" fill="#bfdbfe"/>
+  <text x="348" y="1353" text-anchor="middle" class="pill">INTERNAL</text>
+
+  <!-- ── Arrows: Retriever → Data ── -->
+  <path d="M 600,1366 C 600,1400 600,1420 600,1444" class="data-conn"/>
+  <path d="M 1200,1366 C 1200,1400 1200,1420 1200,1444" class="data-conn"/>
+  <text x="610" y="1412" class="flow-label">read/write</text>
+  <text x="1210" y="1412" class="flow-label">cache</text>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       LAYER 5 — DATA  (y=1444)
+  ══════════════════════════════════════════════════════════════ -->
+  <line x1="60" y1="1440" x2="1740" y2="1440" class="divider"/>
+  <text x="60" y="1458" class="sec-title">5. Data Layer</text>
+  <text x="60" y="1480" class="sec-caption">MongoDB is authoritative; Redis is ephemeral cache only — Redis never wins on conflict</text>
+
+  <!-- MongoDB card (w=830) -->
+  <rect x="60" y="1496" width="830" height="220" rx="22"
+        fill="url(#dataGrad)" stroke="#4ade80" stroke-width="2" filter="url(#shadow)"/>
+  <text x="475" y="1538" text-anchor="middle" class="box-title">MongoDB  :27017</text>
+  <text x="88" y="1566" class="box-body">• documents — raw uploaded docs</text>
+  <text x="88" y="1588" class="box-body">• chunks — text chunks + embeddings</text>
+  <text x="88" y="1610" class="box-body">• incidents — incident records</text>
+  <text x="88" y="1632" class="box-body">• citations — evidence references</text>
+  <text x="88" y="1654" class="box-body">• benchmark_runs — TTFT results</text>
+  <text x="88" y="1676" class="box-body">• agent_sessions + audit_log</text>
+  <rect x="88" y="1694" width="100" height="28" rx="14" fill="#86efac"/>
+  <text x="138" y="1713" text-anchor="middle" class="pill">MONGO 7</text>
+  <rect x="198" y="1694" width="130" height="28" rx="14" fill="#86efac"/>
+  <text x="263" y="1713" text-anchor="middle" class="pill">AUTHORITATIVE</text>
+
+  <!-- Redis card (w=830) -->
+  <rect x="910" y="1496" width="830" height="220" rx="22"
+        fill="url(#dataGrad)" stroke="#4ade80" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1325" y="1538" text-anchor="middle" class="box-title">Redis  :6379</text>
+  <text x="938" y="1566" class="box-body">• api:session:{id}  TTL 30m</text>
+  <text x="938" y="1588" class="box-body">• retriever:query_cache:{hash}  TTL 5m</text>
+  <text x="938" y="1610" class="box-body">• ingestion:status:{doc_id}  TTL 1h</text>
+  <text x="938" y="1632" class="box-body">• ingestion:idempotency:{hash}  TTL 24h</text>
+  <text x="938" y="1654" class="box-body">• benchmark:run:{id}  TTL 1h</text>
+  <text x="938" y="1676" class="box-body">• Ephemeral only — no source-of-truth data</text>
+  <rect x="938" y="1694" width="100" height="28" rx="14" fill="#86efac"/>
+  <text x="988" y="1713" text-anchor="middle" class="pill">REDIS 7</text>
+  <rect x="1048" y="1694" width="110" height="28" rx="14" fill="#86efac"/>
+  <text x="1103" y="1713" text-anchor="middle" class="pill">EPHEMERAL</text>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       LAYER 6 — EXTERNAL  (y=1756)
+  ══════════════════════════════════════════════════════════════ -->
+  <line x1="60" y1="1752" x2="1740" y2="1752" class="divider"/>
+  <text x="60" y="1770" class="sec-title">6. External Systems</text>
+  <text x="60" y="1792" class="sec-caption">Third-party APIs and GPU inference server — accessed via env-configured URLs and API keys</text>
+
+  <!-- OpenAI Embeddings card (w=830) -->
+  <rect x="60" y="1808" width="830" height="32" rx="16"
+        fill="url(#extGrad)" stroke="#fb923c" stroke-width="2" filter="url(#shadow)"/>
+  <text x="475" y="1830" text-anchor="middle" class="box-body">OpenAI API — text-embedding-* (ingestion + retrieval)  |  Chat Completions (LLM_BACKEND=openai)</text>
+
+  <!-- SGLang GPU card (w=830) -->
+  <rect x="910" y="1808" width="830" height="32" rx="16"
+        fill="url(#extGrad)" stroke="#fb923c" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1325" y="1830" text-anchor="middle" class="box-body">SGLang Server — Qwen2.5-7B / Qwen3-8B on RTX 4090  |  RadixAttention  |  SGLANG_BASE_URL</text>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       STUBS NOTICE
+  ══════════════════════════════════════════════════════════════ -->
+  <rect x="60" y="1848" width="1680" height="4" rx="2" fill="#e2e8f0"/>
+
+</svg>
