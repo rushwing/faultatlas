@@ -152,8 +152,11 @@ fi
 if ! uv run python -c "import sglang" &>/dev/null; then
   info "Installing SGLang (GPU-only, not in workspace deps)..."
   # Use Tsinghua mirror — no extra-index-url to avoid hitting pypi.org through proxy
+  # Pin transformers>=4.52 to ensure compatibility with huggingface-hub>=1.0
+  # (older transformers requires huggingface-hub<1.0 which conflicts with workspace deps)
   SGLANG_INSTALL_ARGS=(
     "sglang[all]"
+    "transformers>=4.52.0"
     "--index-url" "https://pypi.tuna.tsinghua.edu.cn/simple"
   )
   for attempt in 1 2 3; do
