@@ -148,26 +148,27 @@ else
   echo "$CURRENT_LOCK_HASH" > "$LOCK_HASH_FILE"
 fi
 
-# SGLang — GPU-only dep, not in pyproject.toml, install separately
-if ! uv run python -c "import sglang" &>/dev/null; then
-  info "Installing SGLang (GPU-only, not in workspace deps)..."
-  # Use Tsinghua mirror — no extra-index-url to avoid hitting pypi.org through proxy
-  # Pin transformers>=4.52 to ensure compatibility with huggingface-hub>=1.0
-  # (older transformers requires huggingface-hub<1.0 which conflicts with workspace deps)
-  SGLANG_INSTALL_ARGS=(
-    "sglang[all]"
-    "transformers>=4.52.0"
-    "--index-url" "https://pypi.tuna.tsinghua.edu.cn/simple"
-  )
+# SGLang — isolated venv to avoid huggingface-hub version conflict with workspace deps
+# (sglang requires huggingface-hub<1.0; workspace uses huggingface-hub>=1.0)
+SGLANG_VENV="${MODEL_DIR}/../.sglang-venv"
+SGLANG_PYTHON="${SGLANG_VENV}/bin/python"
+
+if [[ -f "${SGLANG_VENV}/bin/python" ]] && \
+   "${SGLANG_PYTHON}" -c "import sglang" &>/dev/null; then
+  info "SGLang: already installed in ${SGLANG_VENV}"
+else
+  info "Installing SGLang in isolated venv: ${SGLANG_VENV}"
+  uv venv "${SGLANG_VENV}" --python 3.12
   for attempt in 1 2 3; do
     info "  Install attempt ${attempt}/3..."
-    uv pip install "${SGLANG_INSTALL_ARGS[@]}" && break
+    uv pip install "sglang[all]" \
+      --python "${SGLANG_PYTHON}" \
+      --index-url "https://pypi.tuna.tsinghua.edu.cn/simple" && break
     [[ $attempt -eq 3 ]] && error "SGLang install failed after 3 attempts. Check network/proxy."
     warn "  Attempt ${attempt} failed, retrying in 5s..."
     sleep 5
   done
-else
-  info "SGLang: already installed"
+  info "SGLang installed in isolated venv"
 fi
 
 # =============================================================================
@@ -339,7 +340,7 @@ else
   SGLANG_LOG="${REPO_ROOT}/logs/sglang.log"
   mkdir -p "${REPO_ROOT}/logs"
 
-  nohup uv run python -m sglang.launch_server \
+  nohup "${SGLANG_PYTHON}" -m sglang.launch_server \
     --model-path "${MODEL_LOCAL_PATH}" \
     --host 0.0.0.0 \
     --port "${SGLANG_PORT}" \
