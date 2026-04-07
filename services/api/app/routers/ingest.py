@@ -67,7 +67,10 @@ async def upload_document(
         await redis.delete(idempotency_key)
         raise HTTPException(status_code=500, detail="Document processing failed") from exc
 
-    logger.info("document indexed", extra={"document_id": document_id, "filename": file.filename})
+    logger.info(
+        "document indexed",
+        extra={"document_id": document_id, "uploaded_filename": file.filename},
+    )
     return IngestResponse(
         document_id=document_id,
         status=result["status"],
