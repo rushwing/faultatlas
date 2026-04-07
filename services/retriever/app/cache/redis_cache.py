@@ -18,4 +18,6 @@ async def get_cached_results(redis: Redis, query: str, top_k: int) -> list[dict]
 
 
 async def set_cached_results(redis: Redis, query: str, top_k: int, results: list[dict]) -> None:
+    if not results:
+        return
     await redis.setex(build_query_cache_key(query, top_k), 300, json.dumps(results))
