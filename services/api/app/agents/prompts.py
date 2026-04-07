@@ -1,4 +1,4 @@
-PROMPT_VERSION = "v1"
+PROMPT_VERSION = "v2"
 
 DIAGNOSIS_OUTPUT_SCHEMA = """{
   "summary": "string",

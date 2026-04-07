@@ -211,8 +211,7 @@ _upsert_env() {
 _upsert_env SGLANG_BASE_URL "http://localhost:${SGLANG_PORT}/v1"
 _upsert_env LLM_BACKEND     "sglang"
 _upsert_env MODEL_NAME      "${MODEL_NAME}"
-# When running natively (no Docker), service names like 'retriever' won't resolve
-_upsert_env RETRIEVER_URL   "http://localhost:8001"
+# RETRIEVER_URL is set to localhost only in the native path below (Docker uses service names)
 
 # =============================================================================
 section "Step 4 — Download model weights"
@@ -360,10 +359,11 @@ else
   fi
   info "Redis ready"
 
-  # Update .env to use localhost instead of Docker service names
-  sed -i "s|^MONGO_URI=.*|MONGO_URI=mongodb://localhost:27017|" .env
-  sed -i "s|^REDIS_URL=.*|REDIS_URL=redis://localhost:6379/0|" .env
-  info "Updated .env: MONGO_URI and REDIS_URL → localhost"
+  # Rewrite service URLs to localhost — Docker service names don't resolve natively
+  _upsert_env MONGO_URI      "mongodb://localhost:27017"
+  _upsert_env REDIS_URL      "redis://localhost:6379/0"
+  _upsert_env RETRIEVER_URL  "http://localhost:8001"
+  info "Updated .env: MONGO_URI, REDIS_URL, RETRIEVER_URL → localhost"
 fi
 
 # ninja — required by flashinfer JIT kernel compilation at SGLang startup
