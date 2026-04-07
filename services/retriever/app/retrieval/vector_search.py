@@ -27,17 +27,13 @@ async def vector_search(
     if top_k <= 0:
         return []
 
-    existing_chunk = await db["chunks"].find_one(
-        {"embedding": {"$exists": True}},
-        {"_id": 1},
-    )
-    if existing_chunk is None:
-        logger.debug("vector search skipped because no embedded chunks exist yet")
-        return []
-
     if should_use_local_embeddings(openai_api_key):
+        from faultatlas.embeddings import LOCAL_EMBEDDING_MODEL
+
+        active_model = LOCAL_EMBEDDING_MODEL
         query_vector = embed_text_locally(query)
     else:
+        active_model = embedding_model
         client = AsyncOpenAI(api_key=openai_api_key)
         try:
             response = await client.embeddings.create(input=[query], model=embedding_model)
@@ -45,8 +41,16 @@ async def vector_search(
             raise RuntimeError("embedding_unavailable") from exc
         query_vector = response.data[0].embedding
 
+    chunk_filter = {"embedding": {"$exists": True}, "embedding_model": active_model}
+    existing_chunk = await db["chunks"].find_one(chunk_filter, {"_id": 1})
+    if existing_chunk is None:
+        logger.debug(
+            "vector search skipped: no chunks with embedding_model=%s", active_model
+        )
+        return []
+
     cursor = db["chunks"].find(
-        {"embedding": {"$exists": True}},
+        chunk_filter,
         {"content": 1, "document_id": 1, "embedding": 1},
     )
     results = []

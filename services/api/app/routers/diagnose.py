@@ -50,6 +50,10 @@ async def diagnose(
     except LLMBackendUnavailableError as exc:
         raise HTTPException(status_code=503, detail="llm_unavailable") from exc
     except LLMOutputParseError as exc:
+        logger.error(
+            "llm output parse error",
+            extra={"raw_output": exc.raw_output[:500]},
+        )
         raise HTTPException(
             status_code=500,
             detail="llm_output_parse_error",

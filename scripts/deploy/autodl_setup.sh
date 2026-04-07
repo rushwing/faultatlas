@@ -35,10 +35,17 @@ cd "$REPO_ROOT"
 
 # ── Config (override via env) ─────────────────────────────────────────────────
 MODEL_NAME="${MODEL_NAME:-Qwen/Qwen2.5-7B-Instruct}"
-MODEL_DIR="${MODEL_DIR:-/root/models}"
+# Default to autodl-tmp (large data disk on AutoDL) to avoid filling root overlay
+MODEL_DIR="${MODEL_DIR:-/root/autodl-tmp/models}"
 SGLANG_PORT="${SGLANG_PORT:-8100}"
 SGLANG_MEM_FRACTION="${SGLANG_MEM_FRACTION:-0.88}"
 COMPOSE_FILE="infra/compose/docker-compose.yml"
+
+# Redirect uv download cache to large disk — CUDA wheels are several GB
+export UV_CACHE_DIR="${UV_CACHE_DIR:-/root/autodl-tmp/.uv-cache}"
+
+# Detect whether Docker daemon is reachable (not available in AutoDL containers)
+docker_available() { docker info &>/dev/null; }
 
 # =============================================================================
 section "Step 1 — Environment check"
@@ -57,9 +64,9 @@ fi
 GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -1)
 GPU_VRAM=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader | head -1)
 info "GPU: ${GPU_NAME} (${GPU_VRAM})"
-nvidia-smi --query-gpu=name,memory.total,driver_version,cuda_version \
-  --format=csv,noheader | while IFS=, read -r name mem drv cuda; do
-  info "  Driver: $drv | CUDA: $cuda"
+nvidia-smi --query-gpu=name,memory.total,driver_version \
+  --format=csv,noheader | while IFS=, read -r name mem drv; do
+  info "  Driver: $drv"
 done
 
 # Check VRAM is at least 20GB (Qwen2.5-7B needs ~16GB bf16 + KV cache headroom)
@@ -73,11 +80,11 @@ fi
 section "Step 2 — Install dependencies"
 # =============================================================================
 
-# uv
+# uv — add to PATH first so repeated runs find the existing binary
+export PATH="$HOME/.local/bin:$PATH"
 if ! command -v uv &>/dev/null; then
   info "Installing uv..."
   curl -LsSf https://astral.sh/uv/install.sh | sh
-  export PATH="$HOME/.local/bin:$PATH"
   info "uv installed: $(uv --version)"
 else
   info "uv: $(uv --version)"
@@ -85,10 +92,10 @@ fi
 
 # Docker
 if ! command -v docker &>/dev/null; then
-  info "Installing Docker..."
-  curl -fsSL https://get.docker.com | sh
-  systemctl start docker
-  systemctl enable docker
+  info "Installing Docker via apt (get.docker.com may be inaccessible)..."
+  apt-get update -q && apt-get install -y docker.io
+  systemctl start docker 2>/dev/null || true
+  systemctl enable docker 2>/dev/null || true
   info "Docker installed: $(docker --version)"
 else
   info "Docker: $(docker --version)"
@@ -96,13 +103,21 @@ fi
 
 # Docker Compose plugin
 if ! docker compose version &>/dev/null; then
-  info "Installing Docker Compose plugin..."
-  apt-get install -y docker-compose-plugin
+  info "Installing Docker Compose v2 plugin..."
+  COMPOSE_DIR=/usr/lib/docker/cli-plugins
+  mkdir -p "$COMPOSE_DIR"
+  curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64" \
+    -o "$COMPOSE_DIR/docker-compose"
+  chmod +x "$COMPOSE_DIR/docker-compose"
 fi
+docker compose version &>/dev/null || error "Docker Compose not available. Check network/proxy settings."
 info "Docker Compose: $(docker compose version --short)"
 
 # NVIDIA Container Toolkit (for GPU in Docker)
-if ! dpkg -l | grep -q nvidia-container-toolkit 2>/dev/null; then
+# Skip if running inside a container — GPU passthrough is handled by the host (e.g. AutoDL)
+if [ -f /.dockerenv ] || grep -q 'docker\|lxc' /proc/1/cgroup 2>/dev/null; then
+  info "Running inside a container — skipping NVIDIA Container Toolkit install (GPU passthrough handled by host)"
+elif ! dpkg -l | grep -q nvidia-container-toolkit 2>/dev/null; then
   info "Installing NVIDIA Container Toolkit..."
   curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
     gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
@@ -112,15 +127,49 @@ if ! dpkg -l | grep -q nvidia-container-toolkit 2>/dev/null; then
   apt-get update -q
   apt-get install -y nvidia-container-toolkit
   nvidia-ctk runtime configure --runtime=docker
-  systemctl restart docker
+  service docker restart 2>/dev/null || true
   info "NVIDIA Container Toolkit installed"
 else
   info "NVIDIA Container Toolkit: already installed"
 fi
 
 # Python deps for model download + SGLang
-info "Installing Python workspace dependencies..."
-uv sync --all-packages
+# Use lockfile hash to detect whether sync is needed, avoiding re-sync on reruns
+# while still catching partial/interrupted syncs correctly.
+LOCK_HASH_FILE="${REPO_ROOT}/.venv/.uv_lock_hash"
+CURRENT_LOCK_HASH=$(sha256sum "${REPO_ROOT}/uv.lock" | awk '{print $1}')
+if [[ -d "${REPO_ROOT}/.venv" ]] && \
+   [[ -f "$LOCK_HASH_FILE" ]] && \
+   [[ "$(cat "$LOCK_HASH_FILE")" == "$CURRENT_LOCK_HASH" ]]; then
+  info "Python dependencies up to date — skipping uv sync"
+else
+  info "Installing Python workspace dependencies..."
+  uv sync --all-packages
+  echo "$CURRENT_LOCK_HASH" > "$LOCK_HASH_FILE"
+fi
+
+# SGLang — isolated venv to avoid huggingface-hub version conflict with workspace deps
+# (sglang requires huggingface-hub<1.0; workspace uses huggingface-hub>=1.0)
+SGLANG_VENV="${MODEL_DIR}/../.sglang-venv"
+SGLANG_PYTHON="${SGLANG_VENV}/bin/python"
+
+if [[ -f "${SGLANG_VENV}/bin/python" ]] && \
+   "${SGLANG_PYTHON}" -c "import sglang" &>/dev/null; then
+  info "SGLang: already installed in ${SGLANG_VENV}"
+else
+  info "Installing SGLang in isolated venv: ${SGLANG_VENV}"
+  uv venv "${SGLANG_VENV}" --python 3.12
+  for attempt in 1 2 3; do
+    info "  Install attempt ${attempt}/3..."
+    uv pip install "sglang[all]" \
+      --python "${SGLANG_PYTHON}" \
+      --index-url "https://pypi.tuna.tsinghua.edu.cn/simple" && break
+    [[ $attempt -eq 3 ]] && error "SGLang install failed after 3 attempts. Check network/proxy."
+    warn "  Attempt ${attempt} failed, retrying in 5s..."
+    sleep 5
+  done
+  info "SGLang installed in isolated venv"
+fi
 
 # =============================================================================
 section "Step 3 — Configure environment"
@@ -148,10 +197,21 @@ if ! grep -qE "^OPENAI_API_KEY=sk-" .env 2>/dev/null; then
   fi
 fi
 
-# Inject SGLang URL into .env
-sed -i "s|^SGLANG_BASE_URL=.*|SGLANG_BASE_URL=http://localhost:${SGLANG_PORT}/v1|" .env
-sed -i "s|^LLM_BACKEND=.*|LLM_BACKEND=sglang|" .env
-sed -i "s|^MODEL_NAME=.*|MODEL_NAME=${MODEL_NAME}|" .env
+# Inject/update runtime config into .env regardless of whether it already existed.
+# Use append-if-missing pattern so these keys are always present and correct.
+_upsert_env() {
+  local key="$1" val="$2"
+  if grep -q "^${key}=" .env 2>/dev/null; then
+    sed -i "s|^${key}=.*|${key}=${val}|" .env
+  else
+    echo "${key}=${val}" >> .env
+  fi
+}
+
+_upsert_env SGLANG_BASE_URL "http://localhost:${SGLANG_PORT}/v1"
+_upsert_env LLM_BACKEND     "sglang"
+_upsert_env MODEL_NAME      "${MODEL_NAME}"
+# RETRIEVER_URL is set to localhost only in the native path below (Docker uses service names)
 
 # =============================================================================
 section "Step 4 — Download model weights"
@@ -161,28 +221,69 @@ mkdir -p "$MODEL_DIR"
 
 MODEL_LOCAL_PATH="${MODEL_DIR}/$(echo "$MODEL_NAME" | tr '/' '__')"
 
-if [[ -d "$MODEL_LOCAL_PATH" ]]; then
-  info "Model already downloaded at ${MODEL_LOCAL_PATH}"
+# Verify model integrity: config.json must exist, AND every shard listed in
+# model.safetensors.index.json must be present and >100MB.
+# Falls back to "at least one shard >100MB" if the index file is absent.
+model_complete() {
+  local path="$1"
+  [[ -f "${path}/config.json" ]] && [[ -s "${path}/config.json" ]] || return 1
+
+  local index="${path}/model.safetensors.index.json"
+  if [[ -f "$index" ]]; then
+    # Extract unique shard filenames from the weight_map and verify each one
+    local missing=0
+    while IFS= read -r shard; do
+      if [[ ! -s "${path}/${shard}" ]] || \
+         [[ $(stat -c%s "${path}/${shard}" 2>/dev/null || echo 0) -lt 104857600 ]]; then
+        warn "Missing or incomplete shard: ${shard}"
+        missing=$((missing + 1))
+      fi
+    done < <(python3 -c "
+import json, sys
+with open('${index}') as f:
+    d = json.load(f)
+print('\n'.join(sorted(set(d['weight_map'].values()))))
+" 2>/dev/null)
+    [[ $missing -eq 0 ]]
+  else
+    # No index file — fall back to checking at least one shard >100MB
+    [[ $(find "${path}" -name "*.safetensors" -size +100M | wc -l) -gt 0 ]]
+  fi
+}
+
+if model_complete "$MODEL_LOCAL_PATH"; then
+  info "Model already complete at ${MODEL_LOCAL_PATH}"
 else
+  [[ -d "$MODEL_LOCAL_PATH" ]] && warn "Incomplete model found — resuming download..."
   info "Downloading ${MODEL_NAME} to ${MODEL_LOCAL_PATH}..."
   info "This may take 10–20 minutes on AutoDL (model is ~15 GB)."
 
-  uv run python - <<PYEOF
-from huggingface_hub import snapshot_download
-import os
-
-model_name = os.environ.get("MODEL_NAME", "${MODEL_NAME}")
-local_path = "${MODEL_LOCAL_PATH}"
-
-print(f"Downloading {model_name} → {local_path}")
-snapshot_download(
-    repo_id=model_name,
-    local_dir=local_path,
-    ignore_patterns=["*.msgpack", "*.h5", "flax_model*"],
+  # Try ModelScope first (no proxy needed on AutoDL), fall back to HuggingFace
+  if "${SGLANG_PYTHON}" -c "import modelscope" &>/dev/null 2>&1; then
+    info "Using ModelScope for download..."
+    "${SGLANG_PYTHON}" -c "
+from modelscope import snapshot_download
+path = snapshot_download(
+    model_id='${MODEL_NAME}',
+    local_dir='${MODEL_LOCAL_PATH}',
+    ignore_file_pattern=['*.msgpack', '*.h5', 'flax_model*'],
 )
-print(f"Download complete: {local_path}")
-PYEOF
+print('Download complete:', path)
+"
+  else
+    info "ModelScope not available — using HuggingFace Hub..."
+    uv run python -c "
+from huggingface_hub import snapshot_download
+path = snapshot_download(
+    repo_id='${MODEL_NAME}',
+    local_dir='${MODEL_LOCAL_PATH}',
+    ignore_patterns=['*.msgpack', '*.h5', 'flax_model*'],
+)
+print('Download complete:', path)
+"
+  fi
 
+  model_complete "$MODEL_LOCAL_PATH" || error "Model download incomplete — missing shards. Check disk space and retry."
   info "Model downloaded: ${MODEL_LOCAL_PATH}"
 fi
 
@@ -195,29 +296,86 @@ grep -q "^MODEL_PATH=" .env && \
 section "Step 5 — Start infrastructure (MongoDB + Redis)"
 # =============================================================================
 
-info "Starting MongoDB and Redis..."
-docker compose -f "$COMPOSE_FILE" up mongo redis -d
+if docker_available; then
+  info "Starting MongoDB and Redis via Docker Compose..."
+  docker compose -f "$COMPOSE_FILE" up mongo redis -d
 
-info "Waiting for MongoDB to be healthy..."
-for i in {1..30}; do
-  if docker compose -f "$COMPOSE_FILE" exec -T mongo \
-    mongosh --eval "db.adminCommand('ping')" &>/dev/null; then
-    info "MongoDB ready"
-    break
-  fi
-  [[ $i -eq 30 ]] && error "MongoDB failed to start after 30 seconds"
-  sleep 1
-done
+  info "Waiting for MongoDB to be healthy..."
+  for i in {1..30}; do
+    if docker compose -f "$COMPOSE_FILE" exec -T mongo \
+      mongosh --eval "db.adminCommand('ping')" &>/dev/null; then
+      info "MongoDB ready"
+      break
+    fi
+    [[ $i -eq 30 ]] && error "MongoDB failed to start after 30 seconds"
+    sleep 1
+  done
 
-info "Waiting for Redis to be healthy..."
-for i in {1..20}; do
-  if docker compose -f "$COMPOSE_FILE" exec -T redis redis-cli ping &>/dev/null; then
-    info "Redis ready"
-    break
+  info "Waiting for Redis to be healthy..."
+  for i in {1..20}; do
+    if docker compose -f "$COMPOSE_FILE" exec -T redis redis-cli ping &>/dev/null; then
+      info "Redis ready"
+      break
+    fi
+    [[ $i -eq 20 ]] && error "Redis failed to start after 20 seconds"
+    sleep 1
+  done
+else
+  warn "Docker daemon not available — starting MongoDB and Redis natively"
+
+  # MongoDB
+  if ! command -v mongod &>/dev/null; then
+    info "Installing MongoDB 7..."
+    curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | \
+      gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg
+    echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] \
+      https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" \
+      > /etc/apt/sources.list.d/mongodb-org-7.0.list
+    apt-get update -q && apt-get install -y mongodb-org
   fi
-  [[ $i -eq 20 ]] && error "Redis failed to start after 20 seconds"
-  sleep 1
-done
+  mkdir -p /var/lib/mongodb /var/log/mongodb
+  if ! mongosh --eval "db.adminCommand('ping')" &>/dev/null; then
+    mongod --fork --logpath /var/log/mongodb/mongod.log --dbpath /var/lib/mongodb
+    for i in {1..20}; do
+      mongosh --eval "db.adminCommand('ping')" &>/dev/null && break
+      [[ $i -eq 20 ]] && error "MongoDB failed to start"
+      sleep 1
+    done
+  fi
+  info "MongoDB ready"
+
+  # Redis
+  if ! command -v redis-server &>/dev/null; then
+    info "Installing Redis..."
+    apt-get install -y redis-server
+  fi
+  if ! redis-cli ping &>/dev/null; then
+    redis-server --daemonize yes --logfile /var/log/redis.log
+    for i in {1..10}; do
+      redis-cli ping &>/dev/null && break
+      [[ $i -eq 10 ]] && error "Redis failed to start"
+      sleep 1
+    done
+  fi
+  info "Redis ready"
+
+  # Rewrite service URLs to localhost — Docker service names don't resolve natively
+  _upsert_env MONGO_URI      "mongodb://localhost:27017"
+  _upsert_env REDIS_URL      "redis://localhost:6379/0"
+  _upsert_env RETRIEVER_URL  "http://localhost:8001"
+  info "Updated .env: MONGO_URI, REDIS_URL, RETRIEVER_URL → localhost"
+fi
+
+# ninja — required by flashinfer JIT kernel compilation at SGLang startup
+if ! command -v ninja &>/dev/null; then
+  info "Installing ninja (required by flashinfer)..."
+  apt-get install -y ninja-build
+  # Ubuntu installs as 'ninja-build'; flashinfer subprocess calls 'ninja'
+  ln -sf /usr/bin/ninja-build /usr/local/bin/ninja
+  info "ninja installed: $(ninja --version)"
+else
+  info "ninja: $(ninja --version)"
+fi
 
 # =============================================================================
 section "Step 6 — Start SGLang model server"
@@ -234,7 +392,7 @@ else
   SGLANG_LOG="${REPO_ROOT}/logs/sglang.log"
   mkdir -p "${REPO_ROOT}/logs"
 
-  nohup uv run python -m sglang.launch_server \
+  nohup "${SGLANG_PYTHON}" -m sglang.launch_server \
     --model-path "${MODEL_LOCAL_PATH}" \
     --host 0.0.0.0 \
     --port "${SGLANG_PORT}" \
@@ -247,8 +405,8 @@ else
   echo $SGLANG_PID > "${REPO_ROOT}/logs/sglang.pid"
   info "SGLang PID: ${SGLANG_PID} — logs at ${SGLANG_LOG}"
 
-  info "Waiting for SGLang to be ready (model loading takes 60–120s)..."
-  for i in {1..120}; do
+  info "Waiting for SGLang to be ready (first run with --enable-torch-compile takes 5–10 min for kernel autotuning)..."
+  for i in {1..600}; do
     if curl -sf "http://localhost:${SGLANG_PORT}/health" &>/dev/null; then
       info "SGLang server ready"
       break
@@ -257,7 +415,7 @@ else
     if ! kill -0 "$SGLANG_PID" 2>/dev/null; then
       error "SGLang server process died. Check ${SGLANG_LOG} for details."
     fi
-    [[ $i -eq 120 ]] && error "SGLang failed to start after 120s. Check ${SGLANG_LOG}"
+    [[ $i -eq 600 ]] && error "SGLang failed to start after 600s. Check ${SGLANG_LOG}"
     [[ $((i % 10)) -eq 0 ]] && info "  Still loading... (${i}s)"
     sleep 1
   done
@@ -267,18 +425,53 @@ fi
 section "Step 7 — Start FaultAtlas services"
 # =============================================================================
 
-info "Starting API and Retriever services..."
-docker compose -f "$COMPOSE_FILE" up api retriever ingestion -d --build
+LOG_DIR="${REPO_ROOT}/logs"
+mkdir -p "$LOG_DIR"
 
-info "Waiting for API to be ready..."
-for i in {1..30}; do
-  if curl -sf "http://localhost:8000/health" &>/dev/null; then
-    info "API ready at http://localhost:8000"
-    break
-  fi
-  [[ $i -eq 30 ]] && error "API failed to start. Check: docker compose -f ${COMPOSE_FILE} logs api"
-  sleep 2
-done
+if docker_available; then
+  info "Starting API, Retriever, and Ingestion via Docker Compose..."
+  docker compose -f "$COMPOSE_FILE" up api retriever ingestion -d --build
+
+  info "Waiting for API to be ready..."
+  for i in {1..30}; do
+    if curl -sf "http://localhost:8000/health" &>/dev/null; then
+      info "API ready at http://localhost:8000"
+      break
+    fi
+    [[ $i -eq 30 ]] && error "API failed to start. Check: docker compose -f ${COMPOSE_FILE} logs api"
+    sleep 2
+  done
+else
+  info "Starting API, Retriever, and Ingestion natively via uv..."
+
+  # Use --app-dir so uvicorn finds the correct app.main per service
+  nohup uv run --package faultatlas-api \
+    uvicorn app.main:app --app-dir services/api --host 0.0.0.0 --port 8000 \
+    > "$LOG_DIR/api.log" 2>&1 &
+  echo $! > "$LOG_DIR/api.pid"
+
+  nohup uv run --package faultatlas-retriever \
+    uvicorn app.main:app --app-dir services/retriever --host 0.0.0.0 --port 8001 \
+    > "$LOG_DIR/retriever.log" 2>&1 &
+  echo $! > "$LOG_DIR/retriever.pid"
+
+  # Ingestion is a Phase-1 stub worker (not a FastAPI app), run as a plain script
+  nohup uv run --package faultatlas-ingestion \
+    python -m app.main \
+    > "$LOG_DIR/ingestion.log" 2>&1 &
+  echo $! > "$LOG_DIR/ingestion.pid"
+
+  info "Waiting for API to be ready..."
+  for i in {1..30}; do
+    if curl -sf "http://localhost:8000/health" &>/dev/null; then
+      info "API ready at http://localhost:8000"
+      break
+    fi
+    [[ $i -eq 30 ]] && error "API failed to start. Check: $LOG_DIR/api.log"
+    sleep 2
+  done
+  info "Logs: $LOG_DIR/{api,retriever,ingestion}.log"
+fi
 
 # =============================================================================
 section "Step 8 — Seed knowledge base"

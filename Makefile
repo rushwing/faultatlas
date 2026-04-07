@@ -169,12 +169,12 @@ eval-prompt:  ## Prompt stability check (Layer 1 hash consistency)
 .PHONY: eval-prompt-regression
 eval-prompt-regression:  ## Prompt regression vs saved baseline (run after any prompts.py change)
 	uv run --package faultatlas-harness python harness/evals/prompt/eval_prompt_stability.py \
-	  --mode regression --baseline harness/reports/prompt_baseline_v1.json
+	  --mode regression --baseline harness/reports/prompt_baseline_v2.json
 
 .PHONY: eval-prompt-baseline
 eval-prompt-baseline:  ## Save current prompt performance as baseline
 	uv run --package faultatlas-harness python harness/evals/prompt/eval_prompt_stability.py \
-	  --mode save-baseline --version v1
+	  --mode save-baseline --version v2
 
 .PHONY: eval-model
 eval-model:  ## Model comparison eval (requires GPU + multiple model servers)
