@@ -1,0 +1,24 @@
+# FaultAtlas eval thresholds
+# A run that scores below any threshold is a FAIL.
+# Update this file (with justification comment) when thresholds are intentionally changed.
+
+rag:
+  context_precision: 0.70      # Are the retrieved chunks actually relevant to the query?
+  context_recall: 0.65         # Did we retrieve all the relevant chunks that exist?
+  faithfulness: 0.80           # Is the answer grounded in the retrieved context?
+  answer_relevance: 0.75       # Does the answer actually address the question?
+
+agent:
+  schema_validity: 1.00        # DiagnosisResponse JSON must always be valid (hard requirement)
+  hallucination_score: 0.85    # 1.0 = no hallucination; 0.85 = acceptable rate
+  confidence_calibration: 0.70 # Does stated confidence match actual evidence strength?
+  evidence_citation_rate: 0.90 # % of diagnosis responses that include at least 1 evidence entry
+
+prompt:
+  layer1_stability: 1.00       # Layer 1 token hash must be identical across 100 calls (hard)
+  regression_threshold: 0.05   # A/B: new prompt must not drop faithfulness by more than 5 points
+
+model:
+  # Comparative — no hard threshold; used to inform model selection decisions
+  # See harness/reports/ for historical comparisons
+  min_structured_output_rate: 0.95  # Model must produce parseable JSON at least 95% of the time

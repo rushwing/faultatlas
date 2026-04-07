@@ -1,0 +1,63 @@
+[
+  {
+    "id": "agent-001",
+    "query": "Service startup failing, logs show repeated timeout and handshake error on port 443",
+    "fixture_documents": ["sample_network.log"],
+    "expected": {
+      "confidence_range": ["medium", "high"],
+      "suspected_cause_keywords": ["timeout", "circuit breaker", "connection", "payment-gateway"],
+      "evidence_min_count": 1,
+      "next_actions_min_count": 1
+    },
+    "faithfulness_reference": "The answer must be grounded in the network log fixture. Causes not mentioned in the log (e.g., disk failure) are hallucinations.",
+    "notes": "Core network incident scenario"
+  },
+  {
+    "id": "agent-002",
+    "query": "Java heap space error causing service crash and restart loop",
+    "fixture_documents": ["sample_oom.log"],
+    "expected": {
+      "confidence_range": ["medium", "high"],
+      "suspected_cause_keywords": ["heap", "memory", "OutOfMemoryError", "JVM"],
+      "evidence_min_count": 1,
+      "next_actions_min_count": 1
+    },
+    "faithfulness_reference": "Answer must cite the OOM log. Mentioning -Xmx is acceptable (log contains the heap warning). Mentioning unrelated causes is a hallucination.",
+    "notes": "Core OOM scenario"
+  },
+  {
+    "id": "agent-003",
+    "query": "Database connection pool exhausted during peak traffic",
+    "fixture_documents": [],
+    "expected": {
+      "confidence_range": ["low"],
+      "evidence_min_count": 0,
+      "note_keywords": ["no_knowledge_base_content", "insufficient evidence"]
+    },
+    "faithfulness_reference": "With no relevant documents, the model must NOT fabricate causes. confidence must be 'low'. A response claiming specific root causes without evidence is a hallucination.",
+    "notes": "Empty KB test — model must acknowledge uncertainty, not hallucinate"
+  },
+  {
+    "id": "agent-004",
+    "query": "What is the recommended memory setting for the payment-processor JVM?",
+    "fixture_documents": ["sample_oom.log"],
+    "expected": {
+      "confidence_range": ["low", "medium"],
+      "next_actions_min_count": 1
+    },
+    "faithfulness_reference": "The log mentions 'consider increasing -Xmx' — this is the only evidence available. Specific values (e.g., -Xmx4g) not in the log are hallucinations.",
+    "notes": "Tests that model doesn't extrapolate beyond evidence"
+  },
+  {
+    "id": "agent-005",
+    "query": "Incident summary: multiple services degraded, mixed OOM and network errors",
+    "fixture_documents": ["sample_oom.log", "sample_network.log"],
+    "expected": {
+      "confidence_range": ["medium", "high"],
+      "suspected_cause_keywords": ["memory", "network", "timeout"],
+      "evidence_min_count": 2
+    },
+    "faithfulness_reference": "Multi-document scenario. Evidence must cite from BOTH documents to get high confidence. Citing only one is incomplete, not a hallucination.",
+    "notes": "Multi-document synthesis test"
+  }
+]

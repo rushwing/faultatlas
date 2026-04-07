@@ -1,0 +1,38 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kafka-topic-init
+  namespace: faultatlas
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: topic-init
+          image: bitnami/kafka:3.7
+          command:
+            - /bin/bash
+            - -c
+            - |
+              TOPICS=(
+                "faultatlas.documents.uploaded"
+                "faultatlas.chunks.created"
+                "faultatlas.embeddings.created"
+                "faultatlas.index.updated"
+                "faultatlas.agent.requested"
+                "faultatlas.agent.completed"
+                "faultatlas.incidents.created"
+                "faultatlas.audit.events"
+                "faultatlas.dlq.documents.uploaded"
+                "faultatlas.dlq.chunks.created"
+                "faultatlas.dlq.embeddings.created"
+              )
+              for TOPIC in "${TOPICS[@]}"; do
+                kafka-topics.sh \
+                  --bootstrap-server kafka:9092 \
+                  --create --if-not-exists \
+                  --topic "$TOPIC" \
+                  --partitions 3 \
+                  --replication-factor 1
+              done

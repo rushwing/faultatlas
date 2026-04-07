@@ -1,0 +1,320 @@
+#!/usr/bin/env bash
+# =============================================================================
+# FaultAtlas — AutoDL Quick Setup
+# Target: AutoDL Ubuntu 22.04 + RTX 4090 + CUDA 12.x
+#
+# Usage:
+#   chmod +x scripts/deploy/autodl_setup.sh
+#   ./scripts/deploy/autodl_setup.sh
+#
+# What this does:
+#   1. Verify GPU / CUDA environment
+#   2. Install uv + Docker (if missing)
+#   3. Copy .env.autodl → .env (prompts for OPENAI_API_KEY)
+#   4. Create Kafka topics
+#   5. Download Qwen model weights via snapshot_download
+#   6. Start SGLang server
+#   7. Start FaultAtlas services
+#   8. Run smoke test
+# =============================================================================
+set -euo pipefail
+
+BOLD='\033[1m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+info()    { echo -e "${GREEN}[INFO]${NC}  $*"; }
+warn()    { echo -e "${YELLOW}[WARN]${NC}  $*"; }
+error()   { echo -e "${RED}[ERROR]${NC} $*"; exit 1; }
+section() { echo -e "\n${BOLD}══ $* ══${NC}"; }
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$REPO_ROOT"
+
+# ── Config (override via env) ─────────────────────────────────────────────────
+MODEL_NAME="${MODEL_NAME:-Qwen/Qwen2.5-7B-Instruct}"
+MODEL_DIR="${MODEL_DIR:-/root/models}"
+SGLANG_PORT="${SGLANG_PORT:-8100}"
+SGLANG_MEM_FRACTION="${SGLANG_MEM_FRACTION:-0.88}"
+COMPOSE_FILE="infra/compose/docker-compose.yml"
+
+# =============================================================================
+section "Step 1 — Environment check"
+# =============================================================================
+
+# OS check
+if [[ "$(uname -s)" != "Linux" ]]; then
+  error "This script is for AutoDL Ubuntu. For Windows local dev, use scripts/deploy/wsl2_setup.sh"
+fi
+info "OS: $(lsb_release -ds 2>/dev/null || uname -sr)"
+
+# GPU check
+if ! command -v nvidia-smi &>/dev/null; then
+  error "nvidia-smi not found. Is the NVIDIA driver installed?"
+fi
+GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -1)
+GPU_VRAM=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader | head -1)
+info "GPU: ${GPU_NAME} (${GPU_VRAM})"
+nvidia-smi --query-gpu=name,memory.total,driver_version,cuda_version \
+  --format=csv,noheader | while IFS=, read -r name mem drv cuda; do
+  info "  Driver: $drv | CUDA: $cuda"
+done
+
+# Check VRAM is at least 20GB (Qwen2.5-7B needs ~16GB bf16 + KV cache headroom)
+VRAM_MB=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader | head -1 | tr -d ' MiB')
+if [[ "$VRAM_MB" -lt 20000 ]]; then
+  warn "Less than 20GB VRAM detected. Consider using Qwen2.5-3B or enabling quantization."
+  warn "To use 4-bit quantization: set SGLANG_EXTRA_ARGS='--quantization awq'"
+fi
+
+# =============================================================================
+section "Step 2 — Install dependencies"
+# =============================================================================
+
+# uv
+if ! command -v uv &>/dev/null; then
+  info "Installing uv..."
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  export PATH="$HOME/.local/bin:$PATH"
+  info "uv installed: $(uv --version)"
+else
+  info "uv: $(uv --version)"
+fi
+
+# Docker
+if ! command -v docker &>/dev/null; then
+  info "Installing Docker..."
+  curl -fsSL https://get.docker.com | sh
+  systemctl start docker
+  systemctl enable docker
+  info "Docker installed: $(docker --version)"
+else
+  info "Docker: $(docker --version)"
+fi
+
+# Docker Compose plugin
+if ! docker compose version &>/dev/null; then
+  info "Installing Docker Compose plugin..."
+  apt-get install -y docker-compose-plugin
+fi
+info "Docker Compose: $(docker compose version --short)"
+
+# NVIDIA Container Toolkit (for GPU in Docker)
+if ! dpkg -l | grep -q nvidia-container-toolkit 2>/dev/null; then
+  info "Installing NVIDIA Container Toolkit..."
+  curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
+    gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+  curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+    sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+    tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+  apt-get update -q
+  apt-get install -y nvidia-container-toolkit
+  nvidia-ctk runtime configure --runtime=docker
+  systemctl restart docker
+  info "NVIDIA Container Toolkit installed"
+else
+  info "NVIDIA Container Toolkit: already installed"
+fi
+
+# Python deps for model download + SGLang
+info "Installing Python workspace dependencies..."
+uv sync --all-packages
+
+# =============================================================================
+section "Step 3 — Configure environment"
+# =============================================================================
+
+if [[ ! -f ".env" ]]; then
+  if [[ -f "infra/env/.env.autodl" ]]; then
+    cp infra/env/.env.autodl .env
+    info "Copied infra/env/.env.autodl → .env"
+  else
+    cp .env.example .env
+    info "Copied .env.example → .env"
+  fi
+fi
+
+# Prompt for required secrets if not set
+if ! grep -qE "^OPENAI_API_KEY=sk-" .env 2>/dev/null; then
+  echo -n "Enter your OpenAI API key (for embeddings, or press Enter to skip for local embedding): "
+  read -r OPENAI_KEY
+  if [[ -n "$OPENAI_KEY" ]]; then
+    sed -i "s|^OPENAI_API_KEY=.*|OPENAI_API_KEY=${OPENAI_KEY}|" .env
+    info "OPENAI_API_KEY set in .env"
+  else
+    warn "No OpenAI key set. Make sure OPENAI_API_KEY is configured in .env before starting."
+  fi
+fi
+
+# Inject SGLang URL into .env
+sed -i "s|^SGLANG_BASE_URL=.*|SGLANG_BASE_URL=http://localhost:${SGLANG_PORT}/v1|" .env
+sed -i "s|^LLM_BACKEND=.*|LLM_BACKEND=sglang|" .env
+sed -i "s|^MODEL_NAME=.*|MODEL_NAME=${MODEL_NAME}|" .env
+
+# =============================================================================
+section "Step 4 — Download model weights"
+# =============================================================================
+
+mkdir -p "$MODEL_DIR"
+
+MODEL_LOCAL_PATH="${MODEL_DIR}/$(echo "$MODEL_NAME" | tr '/' '__')"
+
+if [[ -d "$MODEL_LOCAL_PATH" ]]; then
+  info "Model already downloaded at ${MODEL_LOCAL_PATH}"
+else
+  info "Downloading ${MODEL_NAME} to ${MODEL_LOCAL_PATH}..."
+  info "This may take 10–20 minutes on AutoDL (model is ~15 GB)."
+
+  uv run python - <<PYEOF
+from huggingface_hub import snapshot_download
+import os
+
+model_name = os.environ.get("MODEL_NAME", "${MODEL_NAME}")
+local_path = "${MODEL_LOCAL_PATH}"
+
+print(f"Downloading {model_name} → {local_path}")
+snapshot_download(
+    repo_id=model_name,
+    local_dir=local_path,
+    ignore_patterns=["*.msgpack", "*.h5", "flax_model*"],
+)
+print(f"Download complete: {local_path}")
+PYEOF
+
+  info "Model downloaded: ${MODEL_LOCAL_PATH}"
+fi
+
+# Update MODEL_PATH in .env for SGLang server
+grep -q "^MODEL_PATH=" .env && \
+  sed -i "s|^MODEL_PATH=.*|MODEL_PATH=${MODEL_LOCAL_PATH}|" .env || \
+  echo "MODEL_PATH=${MODEL_LOCAL_PATH}" >> .env
+
+# =============================================================================
+section "Step 5 — Start infrastructure (MongoDB + Redis)"
+# =============================================================================
+
+info "Starting MongoDB and Redis..."
+docker compose -f "$COMPOSE_FILE" up mongo redis -d
+
+info "Waiting for MongoDB to be healthy..."
+for i in {1..30}; do
+  if docker compose -f "$COMPOSE_FILE" exec -T mongo \
+    mongosh --eval "db.adminCommand('ping')" &>/dev/null; then
+    info "MongoDB ready"
+    break
+  fi
+  [[ $i -eq 30 ]] && error "MongoDB failed to start after 30 seconds"
+  sleep 1
+done
+
+info "Waiting for Redis to be healthy..."
+for i in {1..20}; do
+  if docker compose -f "$COMPOSE_FILE" exec -T redis redis-cli ping &>/dev/null; then
+    info "Redis ready"
+    break
+  fi
+  [[ $i -eq 20 ]] && error "Redis failed to start after 20 seconds"
+  sleep 1
+done
+
+# =============================================================================
+section "Step 6 — Start SGLang model server"
+# =============================================================================
+
+# Check if SGLang is already running
+if curl -sf "http://localhost:${SGLANG_PORT}/health" &>/dev/null; then
+  info "SGLang server already running at port ${SGLANG_PORT}"
+else
+  info "Starting SGLang server (${MODEL_NAME})..."
+  info "Port: ${SGLANG_PORT} | Mem fraction: ${SGLANG_MEM_FRACTION}"
+
+  # Start in background, write logs to file
+  SGLANG_LOG="${REPO_ROOT}/logs/sglang.log"
+  mkdir -p "${REPO_ROOT}/logs"
+
+  nohup uv run python -m sglang.launch_server \
+    --model-path "${MODEL_LOCAL_PATH}" \
+    --host 0.0.0.0 \
+    --port "${SGLANG_PORT}" \
+    --mem-fraction-static "${SGLANG_MEM_FRACTION}" \
+    --enable-torch-compile \
+    ${SGLANG_EXTRA_ARGS:-} \
+    > "${SGLANG_LOG}" 2>&1 &
+
+  SGLANG_PID=$!
+  echo $SGLANG_PID > "${REPO_ROOT}/logs/sglang.pid"
+  info "SGLang PID: ${SGLANG_PID} — logs at ${SGLANG_LOG}"
+
+  info "Waiting for SGLang to be ready (model loading takes 60–120s)..."
+  for i in {1..120}; do
+    if curl -sf "http://localhost:${SGLANG_PORT}/health" &>/dev/null; then
+      info "SGLang server ready"
+      break
+    fi
+    # Check if the process died
+    if ! kill -0 "$SGLANG_PID" 2>/dev/null; then
+      error "SGLang server process died. Check ${SGLANG_LOG} for details."
+    fi
+    [[ $i -eq 120 ]] && error "SGLang failed to start after 120s. Check ${SGLANG_LOG}"
+    [[ $((i % 10)) -eq 0 ]] && info "  Still loading... (${i}s)"
+    sleep 1
+  done
+fi
+
+# =============================================================================
+section "Step 7 — Start FaultAtlas services"
+# =============================================================================
+
+info "Starting API and Retriever services..."
+docker compose -f "$COMPOSE_FILE" up api retriever ingestion -d --build
+
+info "Waiting for API to be ready..."
+for i in {1..30}; do
+  if curl -sf "http://localhost:8000/health" &>/dev/null; then
+    info "API ready at http://localhost:8000"
+    break
+  fi
+  [[ $i -eq 30 ]] && error "API failed to start. Check: docker compose -f ${COMPOSE_FILE} logs api"
+  sleep 2
+done
+
+# =============================================================================
+section "Step 8 — Seed knowledge base"
+# =============================================================================
+
+read -rp "Seed sample data into knowledge base? [Y/n]: " SEED_CONFIRM
+SEED_CONFIRM="${SEED_CONFIRM:-Y}"
+if [[ "${SEED_CONFIRM^^}" == "Y" ]]; then
+  uv run python scripts/seed_data.py
+  info "Seed complete"
+else
+  info "Skipping seed. Run manually: uv run python scripts/seed_data.py"
+fi
+
+# =============================================================================
+section "Step 9 — Smoke test"
+# =============================================================================
+
+read -rp "Run smoke test? [Y/n]: " SMOKE_CONFIRM
+SMOKE_CONFIRM="${SMOKE_CONFIRM:-Y}"
+if [[ "${SMOKE_CONFIRM^^}" == "Y" ]]; then
+  ./scripts/smoke_test.sh
+fi
+
+# =============================================================================
+section "Setup complete"
+# =============================================================================
+
+echo ""
+echo -e "${GREEN}FaultAtlas is running on AutoDL.${NC}"
+echo ""
+echo "  API docs:       http://localhost:8000/docs"
+echo "  SGLang server:  http://localhost:${SGLANG_PORT}/v1"
+echo "  SGLang logs:    tail -f ${REPO_ROOT}/logs/sglang.log"
+echo ""
+echo "  Run benchmark:  curl -X POST http://localhost:8000/benchmark/run -H 'X-API-Key: changeme-local-dev'"
+echo "  Stop all:       ./scripts/deploy/stop.sh"
+echo "  View logs:      docker compose -f ${COMPOSE_FILE} logs -f"
+echo ""

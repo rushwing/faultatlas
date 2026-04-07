@@ -1,0 +1,30 @@
+[
+  {
+    "id": "prompt-stability-001",
+    "description": "Layer 1 system prefix must be identical across repeated calls",
+    "type": "stability",
+    "runs": 20,
+    "vary": "layer3_only",
+    "assertion": "hash(layer1) identical across all runs",
+    "failure_indicates": "Variable content has been injected into system prompt (timestamp, user_id, etc.)"
+  },
+  {
+    "id": "prompt-regression-001",
+    "description": "Baseline faithfulness score for current prompt version",
+    "type": "regression_baseline",
+    "prompt_version": "v1",
+    "agent_golden_ids": ["agent-001", "agent-002", "agent-003"],
+    "metrics": ["faithfulness", "hallucination_score", "schema_validity"],
+    "notes": "Run this after any change to SYSTEM_PROMPT. New score must not drop > 5 points vs baseline."
+  },
+  {
+    "id": "prompt-ab-001",
+    "description": "Template: A/B comparison structure for prompt experiments",
+    "type": "ab_comparison",
+    "variant_a": "current SYSTEM_PROMPT",
+    "variant_b": "experimental variant (describe changes here)",
+    "agent_golden_ids": ["agent-001", "agent-002", "agent-003", "agent-004", "agent-005"],
+    "metrics": ["faithfulness", "answer_relevance", "hallucination_score"],
+    "decision_rule": "Adopt variant_b only if faithfulness >= variant_a - 0.05 AND hallucination_score >= variant_a - 0.05"
+  }
+]

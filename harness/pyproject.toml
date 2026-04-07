@@ -1,0 +1,24 @@
+[project]
+name = "faultatlas-harness"
+version = "0.1.0"
+description = "FaultAtlas eval harness — AI quality evaluation"
+requires-python = ">=3.12"
+dependencies = [
+    "faultatlas-shared",
+    "ragas>=0.1.9",          # RAG eval: faithfulness, context precision, answer relevance
+    "deepeval>=0.21",        # Agent eval: hallucination, G-Eval
+    "datasets>=2.19",        # RAGAS dataset format
+    "httpx>=0.27",
+    "pyyaml>=6.0",
+    "openai>=1.30",          # used directly in model eval
+]
+
+[tool.uv.sources]
+faultatlas-shared = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["evals"]

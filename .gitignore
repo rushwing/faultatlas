@@ -205,3 +205,19 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# ── FaultAtlas project-specific ──────────────────────────────────────
+# Real .env files — only .env.example is committed
+.env
+.env.*
+!.env.example
+
+# uv lock (committed for reproducibility — keep this line as comment reference)
+# uv.lock is kept in version control per uv recommendations
+
+# Kubernetes real secrets (keep *.yaml.tmpl templates only)
+infra/k8s/secrets/*.yaml
+!infra/k8s/secrets/*.yaml.tmpl
+
+# OS
+.DS_Store

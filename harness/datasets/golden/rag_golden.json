@@ -1,0 +1,37 @@
+[
+  {
+    "id": "rag-001",
+    "query": "Java OutOfMemoryError in payment-processor service",
+    "expected_top_document_keyword": "oom",
+    "expected_chunk_keywords": ["OutOfMemoryError", "heap", "payment-processor"],
+    "notes": "Dense retrieval should surface OOM log sample; keyword overlap is high"
+  },
+  {
+    "id": "rag-002",
+    "query": "TCP connection timeout and circuit breaker opening",
+    "expected_top_document_keyword": "network",
+    "expected_chunk_keywords": ["timeout", "circuit breaker", "TCP"],
+    "notes": "Tests multi-keyword retrieval; circuit breaker is domain-specific term"
+  },
+  {
+    "id": "rag-003",
+    "query": "Service restart loop with heap warning",
+    "expected_top_document_keyword": "oom",
+    "expected_chunk_keywords": ["Restarting", "Heap usage", "heap"],
+    "notes": "Tests that semantic similarity catches paraphrase of OOM scenario"
+  },
+  {
+    "id": "rag-004",
+    "query": "payment gateway connection pool exhausted",
+    "expected_top_document_keyword": "network",
+    "expected_chunk_keywords": ["payment-gateway", "connection"],
+    "notes": "Phase 2 hybrid retrieval test: 'payment-gateway' is an exact string match"
+  },
+  {
+    "id": "rag-005",
+    "query": "what runbook steps should I follow for a memory exhaustion incident",
+    "expected_top_document_keyword": "runbook",
+    "expected_chunk_keywords": ["runbook", "memory", "steps"],
+    "notes": "Tests retrieval of procedural content vs. log content; requires runbook fixture"
+  }
+]

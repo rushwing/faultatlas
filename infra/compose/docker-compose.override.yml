@@ -1,0 +1,28 @@
+# Dev overrides: hot reload via mounted source, skip rebuilding on code changes
+name: faultatlas
+
+services:
+  api:
+    build:
+      target: development
+    volumes:
+      - ../../services/api:/app/services/api
+      - ../../shared:/app/shared
+    command: >
+      uv run --package faultatlas-api
+      uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  ingestion:
+    volumes:
+      - ../../services/ingestion:/app/services/ingestion
+      - ../../shared:/app/shared
+
+  retriever:
+    build:
+      target: development
+    volumes:
+      - ../../services/retriever:/app/services/retriever
+      - ../../shared:/app/shared
+    command: >
+      uv run --package faultatlas-retriever
+      uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload

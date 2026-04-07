@@ -1,0 +1,23 @@
+[project]
+name = "faultatlas-retriever"
+version = "0.1.0"
+description = "FaultAtlas retrieval service — vector + keyword search"
+requires-python = ">=3.12"
+dependencies = [
+    "faultatlas-shared",
+    "fastapi>=0.111",
+    "uvicorn[standard]>=0.30",
+    "openai>=1.30",
+    "numpy>=1.26",
+    "python-json-logger>=2.0",
+]
+
+[tool.uv.sources]
+faultatlas-shared = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
