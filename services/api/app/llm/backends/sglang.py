@@ -89,20 +89,12 @@ class SGLangLLMClient:
         if self._is_fake_backend():
             return await self._complete_fake(messages)
 
-        from ...schemas.diagnosis import DiagnosisLLMOutput
-
         payload = {
             "model": self._model,
             "messages": messages,
             "max_tokens": max_tokens,
             "temperature": temperature,
-            "response_format": {
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "DiagnosisLLMOutput",
-                    "schema": DiagnosisLLMOutput.model_json_schema(),
-                },
-            },
+            "response_format": {"type": "json_object"},
         }
         start = time.monotonic()
         try:
