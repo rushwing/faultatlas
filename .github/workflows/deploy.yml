@@ -23,7 +23,8 @@ jobs:
             set -euo pipefail
             cd "${{ secrets.DEPLOY_PATH }}"
             git fetch --all --prune
-            git checkout "${{ github.sha }}"
+            git rev-parse --verify "${{ github.sha }}^{commit}" >/dev/null 2>&1 || git fetch origin "${{ github.sha }}"
+            git checkout --detach "${{ github.sha }}"
             docker compose -f infra/compose/docker-compose.yml up -d --build mongo redis api retriever
             API_BASE=http://127.0.0.1:8000 API_KEY="${{ secrets.DEPLOY_API_KEY }}" ./scripts/smoke_test.sh
             if [ "${{ github.event.inputs.run_eval_smoke }}" = "true" ]; then

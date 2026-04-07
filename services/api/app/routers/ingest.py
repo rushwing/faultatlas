@@ -14,6 +14,18 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+async def _clear_idempotency_if_not_persisted(
+    db: DBDep,
+    redis: RedisDep,
+    *,
+    idempotency_key: str,
+    document_id: str,
+) -> None:
+    document = await db[Collections.DOCUMENTS].find_one({"_id": document_id}, {"_id": 1})
+    if document is None:
+        await redis.delete(idempotency_key)
+
+
 class IngestResponse(BaseModel):
     document_id: str
     status: str
@@ -37,11 +49,20 @@ async def upload_document(
 
     # Idempotency check
     idempotency_key = RedisKeys.idempotency(doc_hash)
-    if await redis.get(idempotency_key):
-        raise HTTPException(status_code=409, detail="Document already submitted")
+    existing_document_id = await redis.get(idempotency_key)
+    if existing_document_id:
+        status = await redis.get(RedisKeys.doc_status(existing_document_id))
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Document already submitted",
+                "document_id": existing_document_id,
+                "status": status or "unknown",
+            },
+        )
 
     document_id = str(uuid.uuid4())
-    await redis.setex(idempotency_key, 86400, "processing")
+    await redis.setex(idempotency_key, 86400, document_id)
     try:
         result = await ingest_document(
             document_id=document_id,
@@ -56,15 +77,30 @@ async def upload_document(
             chunk_overlap=settings.chunk_overlap,
         )
     except ValueError as exc:
-        await redis.delete(idempotency_key)
+        await _clear_idempotency_if_not_persisted(
+            db,
+            redis,
+            idempotency_key=idempotency_key,
+            document_id=document_id,
+        )
         if str(exc) == "encrypted_pdf":
             raise HTTPException(status_code=500, detail="Document processing failed") from exc
         raise
     except RuntimeError as exc:
-        await redis.delete(idempotency_key)
+        await _clear_idempotency_if_not_persisted(
+            db,
+            redis,
+            idempotency_key=idempotency_key,
+            document_id=document_id,
+        )
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     except Exception as exc:
-        await redis.delete(idempotency_key)
+        await _clear_idempotency_if_not_persisted(
+            db,
+            redis,
+            idempotency_key=idempotency_key,
+            document_id=document_id,
+        )
         raise HTTPException(status_code=500, detail="Document processing failed") from exc
 
     logger.info(

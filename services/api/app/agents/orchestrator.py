@@ -7,8 +7,9 @@ from redis.asyncio import Redis
 
 from ..config import Settings
 from ..llm import get_llm_client
+from ..llm.client import LLMClient, LLMResponse
 from ..llm.errors import LLMBackendUnavailableError, LLMOutputParseError
-from ..schemas.diagnosis import DiagnosisEvidenceItem, DiagnosisResponse
+from ..schemas.diagnosis import DiagnosisEvidenceItem, DiagnosisLLMOutput, DiagnosisResponse
 from .prompt_builder import PromptBundle, build_diagnosis_prompt
 from .prompts import REPAIR_PROMPT
 from .response_parser import parse_diagnosis_output
@@ -18,12 +19,12 @@ logger = logging.getLogger(__name__)
 
 
 async def _complete_with_retry(
-    llm_client,
+    llm_client: LLMClient,
     messages: list[dict[str, str]],
     *,
     max_tokens: int,
     temperature: float,
-):
+) -> LLMResponse:
     delay_seconds = 0.25
     for attempt in range(3):
         try:
@@ -37,6 +38,7 @@ async def _complete_with_retry(
                 raise
             await asyncio.sleep(delay_seconds)
             delay_seconds *= 2
+    raise AssertionError("unreachable")
 
 
 def _build_evidence(
@@ -57,7 +59,7 @@ def _build_evidence(
 async def _run_llm_with_repair(
     settings: Settings,
     prompt_bundle: PromptBundle,
-) -> tuple[DiagnosisResponse | None, dict]:
+) -> tuple[DiagnosisLLMOutput, LLMResponse]:
     llm_client = get_llm_client(settings)
     llm_response = await _complete_with_retry(
         llm_client,
@@ -67,7 +69,7 @@ async def _run_llm_with_repair(
     )
     try:
         parsed = parse_diagnosis_output(llm_response.content)
-        return None, {"parsed": parsed, "llm_response": llm_response}
+        return parsed, llm_response
     except LLMOutputParseError:
         repair_messages = [
             prompt_bundle.messages[0],
@@ -83,7 +85,7 @@ async def _run_llm_with_repair(
             temperature=0.0,
         )
         parsed = parse_diagnosis_output(repair_response.content)
-        return None, {"parsed": parsed, "llm_response": repair_response}
+        return parsed, repair_response
 
 
 async def run_agent(
@@ -105,9 +107,7 @@ async def run_agent(
         raise RuntimeError("retriever_unavailable") from exc
 
     prompt_bundle = build_diagnosis_prompt(query, chunks)
-    _, llm_result = await _run_llm_with_repair(settings, prompt_bundle)
-    parsed = llm_result["parsed"]
-    llm_response = llm_result["llm_response"]
+    parsed, llm_response = await _run_llm_with_repair(settings, prompt_bundle)
 
     evidence = _build_evidence(chunks, parsed.evidence_chunk_ids)
     if not evidence and chunks:

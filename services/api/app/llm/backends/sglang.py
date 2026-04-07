@@ -23,11 +23,10 @@ def _normalize_prefix_cache_hint(value: str | None) -> str:
 
 
 class SGLangLLMClient:
-    _seen_prefixes: set[str] = set()
-
     def __init__(self, settings: Settings) -> None:
         self._base_url = settings.sglang_base_url.rstrip("/")
         self._model = settings.model_name
+        self._seen_prefixes: set[str] = set()
 
     @property
     def _root_url(self) -> str:
