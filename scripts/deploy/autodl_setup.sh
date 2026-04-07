@@ -96,9 +96,14 @@ fi
 
 # Docker Compose plugin
 if ! docker compose version &>/dev/null; then
-  info "Installing Docker Compose plugin..."
-  apt-get install -y docker-compose-plugin
+  info "Installing Docker Compose v2 plugin..."
+  COMPOSE_DIR=/usr/lib/docker/cli-plugins
+  mkdir -p "$COMPOSE_DIR"
+  curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64" \
+    -o "$COMPOSE_DIR/docker-compose"
+  chmod +x "$COMPOSE_DIR/docker-compose"
 fi
+docker compose version &>/dev/null || error "Docker Compose not available. Check network/proxy settings."
 info "Docker Compose: $(docker compose version --short)"
 
 # NVIDIA Container Toolkit (for GPU in Docker)
