@@ -405,18 +405,20 @@ if docker_available; then
 else
   info "Starting API, Retriever, and Ingestion natively via uv..."
 
-  nohup uv run --package faultatlas-api uvicorn app.main:app \
-    --host 0.0.0.0 --port 8000 \
+  # Use --app-dir so uvicorn finds the correct app.main per service
+  nohup uv run --package faultatlas-api \
+    uvicorn app.main:app --app-dir services/api --host 0.0.0.0 --port 8000 \
     > "$LOG_DIR/api.log" 2>&1 &
   echo $! > "$LOG_DIR/api.pid"
 
-  nohup uv run --package faultatlas-retriever uvicorn app.main:app \
-    --host 0.0.0.0 --port 8001 \
+  nohup uv run --package faultatlas-retriever \
+    uvicorn app.main:app --app-dir services/retriever --host 0.0.0.0 --port 8001 \
     > "$LOG_DIR/retriever.log" 2>&1 &
   echo $! > "$LOG_DIR/retriever.pid"
 
-  nohup uv run --package faultatlas-ingestion uvicorn app.main:app \
-    --host 0.0.0.0 --port 8002 \
+  # Ingestion is a Phase-1 stub worker (not a FastAPI app), run as a plain script
+  nohup uv run --package faultatlas-ingestion \
+    python -m app.main \
     > "$LOG_DIR/ingestion.log" 2>&1 &
   echo $! > "$LOG_DIR/ingestion.pid"
 
