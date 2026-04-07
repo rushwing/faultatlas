@@ -197,12 +197,22 @@ if ! grep -qE "^OPENAI_API_KEY=sk-" .env 2>/dev/null; then
   fi
 fi
 
-# Inject SGLang URL into .env
-sed -i "s|^SGLANG_BASE_URL=.*|SGLANG_BASE_URL=http://localhost:${SGLANG_PORT}/v1|" .env
-sed -i "s|^LLM_BACKEND=.*|LLM_BACKEND=sglang|" .env
-sed -i "s|^MODEL_NAME=.*|MODEL_NAME=${MODEL_NAME}|" .env
+# Inject/update runtime config into .env regardless of whether it already existed.
+# Use append-if-missing pattern so these keys are always present and correct.
+_upsert_env() {
+  local key="$1" val="$2"
+  if grep -q "^${key}=" .env 2>/dev/null; then
+    sed -i "s|^${key}=.*|${key}=${val}|" .env
+  else
+    echo "${key}=${val}" >> .env
+  fi
+}
+
+_upsert_env SGLANG_BASE_URL "http://localhost:${SGLANG_PORT}/v1"
+_upsert_env LLM_BACKEND     "sglang"
+_upsert_env MODEL_NAME      "${MODEL_NAME}"
 # When running natively (no Docker), service names like 'retriever' won't resolve
-sed -i "s|^RETRIEVER_URL=.*|RETRIEVER_URL=http://localhost:8001|" .env
+_upsert_env RETRIEVER_URL   "http://localhost:8001"
 
 # =============================================================================
 section "Step 4 — Download model weights"
@@ -212,14 +222,34 @@ mkdir -p "$MODEL_DIR"
 
 MODEL_LOCAL_PATH="${MODEL_DIR}/$(echo "$MODEL_NAME" | tr '/' '__')"
 
-# Verify model integrity: config.json must exist and at least one safetensors shard
-# must be present and non-empty. snapshot_download is resumable so re-running is safe.
+# Verify model integrity: config.json must exist, AND every shard listed in
+# model.safetensors.index.json must be present and >100MB.
+# Falls back to "at least one shard >100MB" if the index file is absent.
 model_complete() {
   local path="$1"
-  [[ -f "${path}/config.json" ]] && \
-  [[ -s "${path}/config.json" ]] && \
-  ls "${path}"/*.safetensors &>/dev/null 2>&1 && \
-  [[ $(find "${path}" -name "*.safetensors" -size +100M | wc -l) -gt 0 ]]
+  [[ -f "${path}/config.json" ]] && [[ -s "${path}/config.json" ]] || return 1
+
+  local index="${path}/model.safetensors.index.json"
+  if [[ -f "$index" ]]; then
+    # Extract unique shard filenames from the weight_map and verify each one
+    local missing=0
+    while IFS= read -r shard; do
+      if [[ ! -s "${path}/${shard}" ]] || \
+         [[ $(stat -c%s "${path}/${shard}" 2>/dev/null || echo 0) -lt 104857600 ]]; then
+        warn "Missing or incomplete shard: ${shard}"
+        missing=$((missing + 1))
+      fi
+    done < <(python3 -c "
+import json, sys
+with open('${index}') as f:
+    d = json.load(f)
+print('\n'.join(sorted(set(d['weight_map'].values()))))
+" 2>/dev/null)
+    [[ $missing -eq 0 ]]
+  else
+    # No index file — fall back to checking at least one shard >100MB
+    [[ $(find "${path}" -name "*.safetensors" -size +100M | wc -l) -gt 0 ]]
+  fi
 }
 
 if model_complete "$MODEL_LOCAL_PATH"; then
@@ -229,23 +259,32 @@ else
   info "Downloading ${MODEL_NAME} to ${MODEL_LOCAL_PATH}..."
   info "This may take 10–20 minutes on AutoDL (model is ~15 GB)."
 
-  uv run python - <<PYEOF
-from huggingface_hub import snapshot_download
-import os
-
-model_name = os.environ.get("MODEL_NAME", "${MODEL_NAME}")
-local_path = "${MODEL_LOCAL_PATH}"
-
-print(f"Downloading {model_name} → {local_path}")
-snapshot_download(
-    repo_id=model_name,
-    local_dir=local_path,
-    ignore_patterns=["*.msgpack", "*.h5", "flax_model*"],
+  # Try ModelScope first (no proxy needed on AutoDL), fall back to HuggingFace
+  if "${SGLANG_PYTHON}" -c "import modelscope" &>/dev/null 2>&1; then
+    info "Using ModelScope for download..."
+    "${SGLANG_PYTHON}" -c "
+from modelscope import snapshot_download
+path = snapshot_download(
+    model_id='${MODEL_NAME}',
+    local_dir='${MODEL_LOCAL_PATH}',
+    ignore_file_pattern=['*.msgpack', '*.h5', 'flax_model*'],
 )
-print(f"Download complete: {local_path}")
-PYEOF
+print('Download complete:', path)
+"
+  else
+    info "ModelScope not available — using HuggingFace Hub..."
+    uv run python -c "
+from huggingface_hub import snapshot_download
+path = snapshot_download(
+    repo_id='${MODEL_NAME}',
+    local_dir='${MODEL_LOCAL_PATH}',
+    ignore_patterns=['*.msgpack', '*.h5', 'flax_model*'],
+)
+print('Download complete:', path)
+"
+  fi
 
-  model_complete "$MODEL_LOCAL_PATH" || error "Model download appears incomplete. Check disk space and retry."
+  model_complete "$MODEL_LOCAL_PATH" || error "Model download incomplete — missing shards. Check disk space and retry."
   info "Model downloaded: ${MODEL_LOCAL_PATH}"
 fi
 
