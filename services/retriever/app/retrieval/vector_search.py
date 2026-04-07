@@ -1,4 +1,5 @@
 import logging
+
 import numpy as np
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from openai import AsyncOpenAI
@@ -26,16 +27,21 @@ async def vector_search(
     response = await client.embeddings.create(input=[query], model=embedding_model)
     query_vector = response.data[0].embedding
 
-    cursor = db["chunks"].find({"embedding": {"$exists": True}}, {"content": 1, "document_id": 1, "embedding": 1})
+    cursor = db["chunks"].find(
+        {"embedding": {"$exists": True}},
+        {"content": 1, "document_id": 1, "embedding": 1},
+    )
     results = []
     async for doc in cursor:
         score = cosine_similarity(query_vector, doc["embedding"])
-        results.append({
-            "chunk_id": doc["_id"],
-            "document_id": doc["document_id"],
-            "content": doc["content"],
-            "score": score,
-        })
+        results.append(
+            {
+                "chunk_id": doc["_id"],
+                "document_id": doc["document_id"],
+                "content": doc["content"],
+                "score": score,
+            }
+        )
 
     results.sort(key=lambda x: x["score"], reverse=True)
     top = results[:top_k]

@@ -1,13 +1,12 @@
-import uuid
 import logging
+import uuid
+
 from fastapi import APIRouter
+from faultatlas.mongo.client import Collections
 from pydantic import BaseModel
 
-from faultatlas.mongo.client import Collections
-from faultatlas.redis.client import RedisKeys
-
-from ..dependencies import AuthDep, DBDep, RedisDep, SettingsDep
 from ..agents.orchestrator import run_agent
+from ..dependencies import AuthDep, DBDep, RedisDep, SettingsDep
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -44,14 +43,16 @@ async def query(
     )
 
     # Persist session
-    await db[Collections.AGENT_SESSIONS].insert_one({
-        "_id": session_id,
-        "user_id": request.user_id,
-        "query": request.query,
-        "answer": result["answer"],
-        "sources": result["sources"],
-        "tokens_used": result["tokens_used"],
-    })
+    await db[Collections.AGENT_SESSIONS].insert_one(
+        {
+            "_id": session_id,
+            "user_id": request.user_id,
+            "query": request.query,
+            "answer": result["answer"],
+            "sources": result["sources"],
+            "tokens_used": result["tokens_used"],
+        }
+    )
 
     return QueryResponse(
         session_id=session_id,

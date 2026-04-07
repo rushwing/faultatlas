@@ -15,16 +15,11 @@ import asyncio
 import json
 import os
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
-from datetime import datetime, UTC
 
 import httpx
-from deepeval import evaluate as deepeval_evaluate
-from deepeval.metrics import (
-    HallucinationMetric,
-    FaithfulnessMetric,
-    AnswerRelevancyMetric,
-)
+from deepeval.metrics import HallucinationMetric
 from deepeval.test_case import LLMTestCase
 
 REPO_ROOT = Path(__file__).parent.parent.parent.parent
@@ -38,14 +33,23 @@ THRESHOLDS_PATH = REPO_ROOT / "harness/thresholds.yaml"
 
 def load_thresholds() -> dict:
     import yaml
+
     with open(THRESHOLDS_PATH) as f:
         return yaml.safe_load(f)["agent"]
 
 
 def validate_schema(response: dict) -> tuple[bool, str]:
     """Validate DiagnosisResponse schema completeness."""
-    required = ["session_id", "summary", "suspected_causes", "evidence",
-                "next_actions", "confidence", "latency_ms", "tokens_used"]
+    required = [
+        "session_id",
+        "summary",
+        "suspected_causes",
+        "evidence",
+        "next_actions",
+        "confidence",
+        "latency_ms",
+        "tokens_used",
+    ]
     missing = [f for f in required if f not in response]
     if missing:
         return False, f"Missing fields: {missing}"
@@ -107,12 +111,14 @@ def build_deepeval_cases(results: list[dict]) -> list[LLMTestCase]:
     for r in results:
         if r["error"] or not r["schema_valid"]:
             continue
-        cases.append(LLMTestCase(
-            input=r["query"],
-            actual_output=r["summary"],
-            context=r["context"] if r["context"] else ["No evidence retrieved"],
-            expected_output=None,  # we use context-based metrics, not exact match
-        ))
+        cases.append(
+            LLMTestCase(
+                input=r["query"],
+                actual_output=r["summary"],
+                context=r["context"] if r["context"] else ["No evidence retrieved"],
+                expected_output=None,  # we use context-based metrics, not exact match
+            )
+        )
     return cases
 
 
@@ -122,11 +128,7 @@ def run_eval(smoke: bool = False) -> dict:
     thresholds = load_thresholds()
 
     print(f"Running {len(cases)} diagnosis cases{'  (smoke)' if smoke else ''}...")
-    results = asyncio.run(
-        asyncio.gather(*[
-            _run_all(cases)
-        ])
-    )[0]
+    results = asyncio.run(asyncio.gather(*[_run_all(cases)]))[0]
 
     # Schema validity
     schema_valid_count = sum(1 for r in results if r["schema_valid"])
@@ -149,7 +151,9 @@ def run_eval(smoke: bool = False) -> dict:
         for tc in deepeval_cases:
             hal_metric.measure(tc)
             hallucination_scores.append(hal_metric.score)
-    hallucination_score = sum(hallucination_scores) / len(hallucination_scores) if hallucination_scores else 0.0
+    hallucination_score = (
+        sum(hallucination_scores) / len(hallucination_scores) if hallucination_scores else 0.0
+    )
 
     scores = {
         "schema_validity": schema_validity,
@@ -185,12 +189,18 @@ def run_eval(smoke: bool = False) -> dict:
         "thresholds": thresholds,
         "passed": passed,
         "case_results": [
-            {"id": r["id"], "schema_valid": r["schema_valid"],
-             "has_evidence": r["has_evidence"], "confidence": r["confidence"]}
+            {
+                "id": r["id"],
+                "schema_valid": r["schema_valid"],
+                "has_evidence": r["has_evidence"],
+                "confidence": r["confidence"],
+            }
             for r in results
         ],
     }
-    report_path = REPO_ROOT / f"harness/reports/agent_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}.json"
+    report_path = (
+        REPO_ROOT / f"harness/reports/agent_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}.json"
+    )
     report_path.parent.mkdir(exist_ok=True)
     report_path.write_text(json.dumps(report, indent=2))
     print(f"\n  Report saved: {report_path.relative_to(REPO_ROOT)}")

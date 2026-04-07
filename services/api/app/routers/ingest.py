@@ -1,15 +1,15 @@
 import hashlib
-import uuid
 import logging
-from fastapi import APIRouter, UploadFile, File, HTTPException
-from pydantic import BaseModel
+import uuid
 
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from faultatlas.events.document_events import DocumentUploaded
 from faultatlas.kafka.topics import Topics
 from faultatlas.mongo.client import Collections
 from faultatlas.redis.client import RedisKeys
+from pydantic import BaseModel
 
-from ..dependencies import AuthDep, DBDep, RedisDep, KafkaDep
+from ..dependencies import AuthDep, DBDep, KafkaDep, RedisDep
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -42,14 +42,16 @@ async def upload_document(
     storage_path = f"uploads/{document_id}/{file.filename}"
 
     # Persist document record
-    await db[Collections.DOCUMENTS].insert_one({
-        "_id": document_id,
-        "filename": file.filename,
-        "content_type": file.content_type,
-        "status": "pending",
-        "source_metadata": {"size_bytes": len(content)},
-        "correlation_id": correlation_id,
-    })
+    await db[Collections.DOCUMENTS].insert_one(
+        {
+            "_id": document_id,
+            "filename": file.filename,
+            "content_type": file.content_type,
+            "status": "pending",
+            "source_metadata": {"size_bytes": len(content)},
+            "correlation_id": correlation_id,
+        }
+    )
 
     # Set idempotency key (24h TTL)
     await redis.setex(idempotency_key, 86400, "processing")

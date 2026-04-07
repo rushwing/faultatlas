@@ -38,6 +38,7 @@ from pathlib import Path
 
 try:
     import yaml
+
     HAS_YAML = True
 except ImportError:
     HAS_YAML = False
@@ -50,6 +51,7 @@ REQ_REF_PATTERN = re.compile(r"\bREQ-\d{3}\b", re.IGNORECASE)
 # ---------------------------------------------------------------------------
 # Frontmatter parsing (pure stdlib fallback if PyYAML not available)
 # ---------------------------------------------------------------------------
+
 
 def parse_frontmatter(path: Path) -> dict:
     content = path.read_text()
@@ -92,6 +94,7 @@ def find_req_file(req_id: str, tasks_dir: Path) -> Path | None:
 # Load GitHub event
 # ---------------------------------------------------------------------------
 
+
 def load_event(event_path: str) -> dict:
     p = Path(event_path)
     if not p.exists():
@@ -113,10 +116,13 @@ def extract_changed_files(event: dict) -> list[str]:
     head = os.environ.get("GITHUB_HEAD_REF", "")
     if base and head:
         import subprocess
+
         try:
             result = subprocess.run(
                 ["git", "diff", "--name-only", f"origin/{base}...HEAD"],
-                capture_output=True, text=True, check=True
+                capture_output=True,
+                text=True,
+                check=True,
             )
             return [f for f in result.stdout.splitlines() if f.strip()]
         except subprocess.CalledProcessError:
@@ -125,14 +131,13 @@ def extract_changed_files(event: dict) -> list[str]:
 
 
 def extract_pr_body(event: dict) -> str:
-    return (
-        event.get("pull_request", {}).get("body") or ""
-    )
+    return event.get("pull_request", {}).get("body") or ""
 
 
 # ---------------------------------------------------------------------------
 # Gate logic
 # ---------------------------------------------------------------------------
+
 
 def check_changed_reqs(changed_files: list[str], tasks_dir: Path) -> list[str]:
     errors = []
@@ -146,8 +151,7 @@ def check_changed_reqs(changed_files: list[str], tasks_dir: Path) -> list[str]:
         status = front.get("status", "unknown")
         if status in BLOCKED_STATUSES:
             errors.append(
-                f"BLOCKED {p.name}: status='{status}' — "
-                f"must be 'ready' or beyond before merging"
+                f"BLOCKED {p.name}: status='{status}' — must be 'ready' or beyond before merging"
             )
         else:
             print(f"  OK {p.name}: status='{status}'")
@@ -224,6 +228,7 @@ def write_github_output(key: str, value: str, output_file: str | None) -> None:
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="REQ status merge gate")
     parser.add_argument("--event-path", default=os.environ.get("GITHUB_EVENT_PATH", ""))
@@ -266,7 +271,8 @@ def main() -> int:
     autofixed_flag = "true" if autofixed else "false"
     summary_lines = []
     if autofixed:
-        summary_lines.append(f"Auto-advanced {len(autofixed)} requirement(s): {', '.join(autofixed)}")
+        req_list = ", ".join(autofixed)
+        summary_lines.append(f"Auto-advanced {len(autofixed)} requirement(s): {req_list}")
     if errors:
         summary_lines.extend(errors)
     else:

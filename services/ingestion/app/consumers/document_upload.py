@@ -1,18 +1,21 @@
-import asyncio
 import logging
-from motor.motor_asyncio import AsyncIOMotorDatabase
-from redis.asyncio import Redis
 
 from faultatlas.kafka.producer import KafkaProducer
 from faultatlas.redis.client import RedisKeys
+from motor.motor_asyncio import AsyncIOMotorDatabase
+from redis.asyncio import Redis
 
 from ..config import Settings
-from ..processors.extractor import extract_text
 from ..processors.chunker import chunk_text
 from ..processors.embedder import embed_chunks
+from ..processors.extractor import extract_text
+from ..producers.events import (
+    publish_chunks_created,
+    publish_embeddings_created,
+    publish_index_updated,
+)
 from ..storage.mongo import save_chunks, update_document_status
 from ..storage.vector import upsert_embeddings
-from ..producers.events import publish_chunks_created, publish_embeddings_created, publish_index_updated
 
 logger = logging.getLogger(__name__)
 
@@ -46,9 +49,13 @@ async def handle_document_uploaded(
     await redis.setex(RedisKeys.doc_status(document_id), 3600, "embedding")
     await update_document_status(db, document_id, "embedding")
 
-    embeddings = await embed_chunks(chunks, settings.openai_embedding_model, settings.openai_api_key)
+    embeddings = await embed_chunks(
+        chunks, settings.openai_embedding_model, settings.openai_api_key
+    )
     await upsert_embeddings(db, chunk_ids, embeddings, settings.openai_embedding_model)
-    publish_embeddings_created(producer, document_id, chunk_ids, settings.openai_embedding_model, correlation_id)
+    publish_embeddings_created(
+        producer, document_id, chunk_ids, settings.openai_embedding_model, correlation_id
+    )
 
     await redis.setex(RedisKeys.doc_status(document_id), 3600, "indexed")
     await update_document_status(db, document_id, "indexed")

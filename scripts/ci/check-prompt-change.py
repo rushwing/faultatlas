@@ -108,9 +108,7 @@ def check_pr_body(pr_body: str, changed_files: list[str]) -> tuple[bool, list[st
         f"Found 0/{MIN_MATCHES} required eval acknowledgment tokens."
     )
     messages.append("")
-    messages.append(
-        "When changing prompts.py, add an eval note to your PR description. Example:"
-    )
+    messages.append("When changing prompts.py, add an eval note to your PR description. Example:")
     messages.append("")
     messages.append("  ## Eval Results")
     messages.append("  - `make eval-prompt` passed (layer1_stability = 1.00)")

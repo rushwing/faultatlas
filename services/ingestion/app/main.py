@@ -6,7 +6,7 @@ import sys
 from faultatlas.kafka.consumer import KafkaConsumer
 from faultatlas.kafka.producer import KafkaProducer
 from faultatlas.kafka.topics import Topics
-from faultatlas.mongo.client import get_database, close_client
+from faultatlas.mongo.client import close_client, get_database
 from faultatlas.redis.client import get_redis
 
 from .config import get_settings

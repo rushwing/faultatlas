@@ -22,8 +22,8 @@ import asyncio
 import json
 import os
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
-from datetime import datetime, UTC
 
 import httpx
 
@@ -68,11 +68,12 @@ async def diagnose_with_backend(
     without restarting the main service.
     """
     import time
+
     from openai import AsyncOpenAI
 
     # Import prompt builder
     sys.path.insert(0, str(REPO_ROOT / "services/api"))
-    from app.agents.prompts import SYSTEM_PROMPT, RAG_PROMPT
+    from app.agents.prompts import RAG_PROMPT, SYSTEM_PROMPT
 
     context = "\n\n---\n\n".join(context_chunks)
     user_prompt = RAG_PROMPT.format(context=context, question=query)
@@ -96,7 +97,8 @@ async def diagnose_with_backend(
         # Try to parse as JSON
         try:
             import re
-            json_match = re.search(r'\{.*\}', content, re.DOTALL)
+
+            json_match = re.search(r"\{.*\}", content, re.DOTALL)
             parsed = json.loads(json_match.group() if json_match else content)
             valid_json = True
         except Exception:
@@ -126,6 +128,7 @@ async def diagnose_with_backend(
 
 def run_eval(backends: list[str] | None = None) -> dict:
     import yaml
+
     thresholds = yaml.safe_load(THRESHOLDS_PATH.read_text())["model"]
     golden = json.loads(GOLDEN_PATH.read_text())[:3]  # Model eval uses subset
 
@@ -152,15 +155,17 @@ def run_eval(backends: list[str] | None = None) -> dict:
             "meets_threshold": structured_output_rate >= thresholds["min_structured_output_rate"],
         }
 
-    print(f"\n── Model Comparison Results {'─'*35}")
+    print(f"\n── Model Comparison Results {'─' * 35}")
     print(f"  {'Backend':<25} {'JSON Rate':>10} {'Avg Latency':>14} {'Status':>8}")
-    print(f"  {'─'*25} {'─'*10} {'─'*14} {'─'*8}")
+    print(f"  {'─' * 25} {'─' * 10} {'─' * 14} {'─' * 8}")
     for bid, r in comparison.items():
         status = "PASS" if r["meets_threshold"] else "FAIL"
-        print(f"  {bid:<25} {r['structured_output_rate']:>9.1%} {r['avg_latency_ms']:>12.0f}ms  [{status}]")
-    print(f"  {'─'*60}")
-    print(f"\n  Note: This is a comparative report. No single 'pass/fail'.")
-    print(f"  Use this to inform model selection decisions.")
+        rate = r["structured_output_rate"]
+        lat = r["avg_latency_ms"]
+        print(f"  {bid:<25} {rate:>9.1%} {lat:>12.0f}ms  [{status}]")
+    print(f"  {'─' * 60}")
+    print("\n  Note: This is a comparative report. No single 'pass/fail'.")
+    print("  Use this to inform model selection decisions.")
 
     overall_pass = all(r["meets_threshold"] for r in comparison.values())
 
@@ -171,7 +176,8 @@ def run_eval(backends: list[str] | None = None) -> dict:
         "passed": overall_pass,  # True only if ALL backends meet min structured output rate
     }
 
-    report_path = REPO_ROOT / f"harness/reports/model_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}.json"
+    ts = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+    report_path = REPO_ROOT / f"harness/reports/model_{ts}.json"
     report_path.parent.mkdir(exist_ok=True)
     report_path.write_text(json.dumps(report, indent=2))
     print(f"\n  Report saved: {report_path.relative_to(REPO_ROOT)}")
@@ -182,16 +188,22 @@ def run_eval(backends: list[str] | None = None) -> dict:
 async def _run_backend(config: dict, golden: list[dict]) -> list[dict]:
     async with httpx.AsyncClient() as client:
         # For simplicity, use empty context (tests model capability, not retrieval)
-        return await asyncio.gather(*[
-            diagnose_with_backend(client, config["api_base"], case["query"], [])
-            for case in golden
-        ])
+        return await asyncio.gather(
+            *[
+                diagnose_with_backend(client, config["api_base"], case["query"], [])
+                for case in golden
+            ]
+        )
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--backends", nargs="+", choices=list(BACKENDS.keys()),
-                        help="Backends to compare (default: all)")
+    parser.add_argument(
+        "--backends",
+        nargs="+",
+        choices=list(BACKENDS.keys()),
+        help="Backends to compare (default: all)",
+    )
     args = parser.parse_args()
 
     report = run_eval(backends=args.backends)

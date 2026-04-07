@@ -1,7 +1,7 @@
-from faultatlas.kafka.producer import KafkaProducer
-from faultatlas.kafka.topics import Topics
 from faultatlas.events.chunk_events import ChunksCreated, EmbeddingsCreated
 from faultatlas.events.document_events import DocumentIndexed
+from faultatlas.kafka.producer import KafkaProducer
+from faultatlas.kafka.topics import Topics
 
 
 def publish_chunks_created(
@@ -34,6 +34,8 @@ def publish_index_updated(
 ) -> None:
     producer.publish(
         Topics.INDEX_UPDATED,
-        DocumentIndexed(document_id=document_id, chunk_count=chunk_count, correlation_id=correlation_id),
+        DocumentIndexed(
+            document_id=document_id, chunk_count=chunk_count, correlation_id=correlation_id
+        ),
         key=document_id,
     )

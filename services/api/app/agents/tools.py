@@ -1,9 +1,9 @@
 import hashlib
 import logging
-import httpx
-from redis.asyncio import Redis
 
+import httpx
 from faultatlas.redis.client import RedisKeys
+from redis.asyncio import Redis
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +21,7 @@ async def retrieve_context(
     cached = await redis.get(cache_key)
     if cached:
         import json
+
         logger.debug("retriever cache hit", extra={"query_hash": query_hash})
         return json.loads(cached)
 
@@ -33,5 +34,6 @@ async def retrieve_context(
         results = response.json()["results"]
 
     import json
+
     await redis.setex(cache_key, 300, json.dumps(results))
     return results

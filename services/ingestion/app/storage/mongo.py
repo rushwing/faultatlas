@@ -1,9 +1,9 @@
-import uuid
 import logging
-from datetime import datetime, UTC
-from motor.motor_asyncio import AsyncIOMotorDatabase
+import uuid
+from datetime import UTC, datetime
 
 from faultatlas.mongo.client import Collections
+from motor.motor_asyncio import AsyncIOMotorDatabase
 
 logger = logging.getLogger(__name__)
 
@@ -20,15 +20,17 @@ async def save_chunks(
     for i, text in enumerate(texts):
         chunk_id = str(uuid.uuid4())
         chunk_ids.append(chunk_id)
-        docs.append({
-            "_id": chunk_id,
-            "document_id": document_id,
-            "content": text,
-            "chunk_index": i,
-            "token_count": len(text.split()),
-            "embedding_model": embedding_model,
-            "created_at": now,
-        })
+        docs.append(
+            {
+                "_id": chunk_id,
+                "document_id": document_id,
+                "content": text,
+                "chunk_index": i,
+                "token_count": len(text.split()),
+                "embedding_model": embedding_model,
+                "created_at": now,
+            }
+        )
     await db[Collections.CHUNKS].insert_many(docs)
     logger.info("chunks saved", extra={"document_id": document_id, "count": len(docs)})
     return chunk_ids

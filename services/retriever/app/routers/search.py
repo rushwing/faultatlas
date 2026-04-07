@@ -1,14 +1,13 @@
 import logging
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
-from motor.motor_asyncio import AsyncIOMotorDatabase
 
+from fastapi import APIRouter, Depends
 from faultatlas.mongo.client import get_database
-from faultatlas.redis.client import get_redis
+from motor.motor_asyncio import AsyncIOMotorDatabase
+from pydantic import BaseModel
 
 from ..config import Settings, get_settings
-from ..retrieval.vector_search import vector_search
 from ..retrieval.context_builder import build_context
+from ..retrieval.vector_search import vector_search
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

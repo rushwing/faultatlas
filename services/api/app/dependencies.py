@@ -1,12 +1,12 @@
 from typing import Annotated
+
 from fastapi import Depends, HTTPException, Security
 from fastapi.security import APIKeyHeader
-from motor.motor_asyncio import AsyncIOMotorDatabase
-from redis.asyncio import Redis
-
+from faultatlas.kafka.producer import KafkaProducer
 from faultatlas.mongo.client import get_database
 from faultatlas.redis.client import get_redis
-from faultatlas.kafka.producer import KafkaProducer
+from motor.motor_asyncio import AsyncIOMotorDatabase
+from redis.asyncio import Redis
 
 from .config import Settings, get_settings
 

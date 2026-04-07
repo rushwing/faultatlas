@@ -1,5 +1,5 @@
-import json
 import logging
+
 from confluent_kafka import Producer as ConfluentProducer
 from pydantic import BaseModel
 
