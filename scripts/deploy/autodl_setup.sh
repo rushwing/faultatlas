@@ -85,10 +85,10 @@ fi
 
 # Docker
 if ! command -v docker &>/dev/null; then
-  info "Installing Docker..."
-  curl -fsSL https://get.docker.com | sh
-  systemctl start docker
-  systemctl enable docker
+  info "Installing Docker via apt (get.docker.com may be inaccessible)..."
+  apt-get update -q && apt-get install -y docker.io
+  systemctl start docker 2>/dev/null || true
+  systemctl enable docker 2>/dev/null || true
   info "Docker installed: $(docker --version)"
 else
   info "Docker: $(docker --version)"
