@@ -364,8 +364,8 @@ else
   echo $SGLANG_PID > "${REPO_ROOT}/logs/sglang.pid"
   info "SGLang PID: ${SGLANG_PID} — logs at ${SGLANG_LOG}"
 
-  info "Waiting for SGLang to be ready (model loading takes 60–120s)..."
-  for i in {1..120}; do
+  info "Waiting for SGLang to be ready (first run with --enable-torch-compile takes 5–10 min for kernel autotuning)..."
+  for i in {1..600}; do
     if curl -sf "http://localhost:${SGLANG_PORT}/health" &>/dev/null; then
       info "SGLang server ready"
       break
@@ -374,7 +374,7 @@ else
     if ! kill -0 "$SGLANG_PID" 2>/dev/null; then
       error "SGLang server process died. Check ${SGLANG_LOG} for details."
     fi
-    [[ $i -eq 120 ]] && error "SGLang failed to start after 120s. Check ${SGLANG_LOG}"
+    [[ $i -eq 600 ]] && error "SGLang failed to start after 600s. Check ${SGLANG_LOG}"
     [[ $((i % 10)) -eq 0 ]] && info "  Still loading... (${i}s)"
     sleep 1
   done
