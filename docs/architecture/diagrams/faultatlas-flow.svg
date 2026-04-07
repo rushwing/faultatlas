@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1400" height="1380"
+     viewBox="0 0 1400 1380"
+     role="img"
+     aria-labelledby="flow-title flow-desc">
+  <title id="flow-title">FaultAtlas — Request Flow</title>
+  <desc id="flow-desc">Orchestration flow for the two primary request paths: POST /diagnose (RAG agent) and POST /benchmark/run (TTFT benchmark), including the repair loop and benchmark conditions.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#eef2f7"/>
+    </linearGradient>
+    <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ede9fe"/>
+      <stop offset="100%" stop-color="#c4b5fd"/>
+    </linearGradient>
+    <linearGradient id="phase" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#e2e8f0"/>
+    </linearGradient>
+    <linearGradient id="search" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff7ed"/>
+      <stop offset="100%" stop-color="#ffedd5"/>
+    </linearGradient>
+    <linearGradient id="packet" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ecfeff"/>
+      <stop offset="100%" stop-color="#cffafe"/>
+    </linearGradient>
+    <linearGradient id="runtimeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ede9fe"/>
+      <stop offset="100%" stop-color="#c4b5fd"/>
+    </linearGradient>
+    <linearGradient id="dataGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f0fdf4"/>
+      <stop offset="100%" stop-color="#bbf7d0"/>
+    </linearGradient>
+    <linearGradient id="successGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f0fdf4"/>
+      <stop offset="100%" stop-color="#86efac"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#0f172a" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#475569"/>
+    </marker>
+    <marker id="arrow-orange" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#f97316"/>
+    </marker>
+    <style>
+      .arch-title    { font: 700 32px 'Helvetica Neue', Arial, sans-serif; fill: #0f172a; }
+      .arch-subtitle { font: 500 16px 'Helvetica Neue', Arial, sans-serif; fill: #1e293b; }
+      .arch-meta     { font: 500 14px 'Helvetica Neue', Arial, sans-serif; fill: #334155; }
+      .sec-title     { font: 700 18px 'Helvetica Neue', Arial, sans-serif; fill: #0f172a; letter-spacing: 0.4px; }
+      .sec-caption   { font: 500 13px 'Helvetica Neue', Arial, sans-serif; fill: #334155; }
+      .box-title     { font: 700 18px 'Helvetica Neue', Arial, sans-serif; fill: #0f172a; }
+      .box-body      { font: 500 13px 'Helvetica Neue', Arial, sans-serif; fill: #1e293b; }
+      .box-small     { font: 500 12px 'Helvetica Neue', Arial, sans-serif; fill: #334155; }
+      .pill          { font: 700 11px 'Helvetica Neue', Arial, sans-serif; fill: #0f172a; letter-spacing: 0.8px; }
+      .flow-label    { font: 500 12px 'Helvetica Neue', Arial, sans-serif; fill: #475569; }
+      .lane-label    { font: 700 13px 'Helvetica Neue', Arial, sans-serif; fill: #64748b; letter-spacing: 1px; }
+      .divider       { stroke: #cbd5e1; stroke-width: 1; stroke-dasharray: 6 6; }
+      .connector     { stroke: #475569; stroke-width: 2.5; fill: none; marker-end: url(#arrow); }
+      .soft-conn     { stroke: #64748b; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+      .repair-conn   { stroke: #f97316; stroke-width: 2; fill: none; stroke-dasharray: 6 3; marker-end: url(#arrow-orange); }
+      .data-conn     { stroke: #3b82f6; stroke-width: 2; fill: none; stroke-dasharray: 5 3; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1400" height="1380" fill="url(#bg)"/>
+
+  <!-- ── Header ── -->
+  <rect x="40" y="28" width="1320" height="92" rx="24" fill="url(#headerGrad)" filter="url(#shadow)"/>
+  <text x="74" y="73"  class="arch-title">FaultAtlas — Request Flow</text>
+  <text x="74" y="100" class="arch-subtitle">Orchestration graph: /diagnose (RAG agent) and /benchmark/run (TTFT benchmark)</text>
+  <text x="1060" y="73"  class="arch-meta">source: ~/Dev/faultatlas</text>
+  <text x="1060" y="100" class="arch-meta">generated: 2026-04-07</text>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       LANE BACKGROUNDS
+  ══════════════════════════════════════════════════════════════ -->
+  <!-- Left lane: /diagnose -->
+  <rect x="40" y="148" width="620" height="1200" rx="16" fill="#f1f5f9" opacity="0.6"/>
+  <text x="350" y="172" text-anchor="middle" class="lane-label">POST /diagnose</text>
+
+  <!-- Right lane: /benchmark/run -->
+  <rect x="740" y="148" width="620" height="1200" rx="16" fill="#f1f5f9" opacity="0.6"/>
+  <text x="1050" y="172" text-anchor="middle" class="lane-label">POST /benchmark/run</text>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       /diagnose FLOW  (left lane, cx=350)
+  ══════════════════════════════════════════════════════════════ -->
+
+  <!-- Phase 1: Client Request -->
+  <rect x="110" y="188" width="480" height="72" rx="18"
+        fill="url(#phase)" stroke="#cbd5e1" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="350" y="218" text-anchor="middle" class="box-title">Client Request</text>
+  <text x="350" y="242" text-anchor="middle" class="box-body">POST /diagnose  { query, session_id }</text>
+
+  <line x1="350" y1="260" x2="350" y2="296" class="connector"/>
+  <text x="360" y="284" class="flow-label">route</text>
+
+  <!-- Phase 2: retrieve_context -->
+  <rect x="110" y="296" width="480" height="72" rx="18"
+        fill="url(#search)" stroke="#fed7aa" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="350" y="326" text-anchor="middle" class="box-title">retrieve_context(query)</text>
+  <text x="350" y="350" text-anchor="middle" class="box-body">HTTP → Retriever :8001 · Redis cache check · cosine scan</text>
+
+  <line x1="350" y1="368" x2="350" y2="404" class="connector"/>
+  <text x="360" y="392" class="flow-label">top-k chunks</text>
+
+  <!-- Phase 3: build_diagnosis_prompt -->
+  <rect x="110" y="404" width="480" height="100" rx="18"
+        fill="url(#packet)" stroke="#67e8f9" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="350" y="434" text-anchor="middle" class="box-title">build_diagnosis_prompt()</text>
+  <text x="350" y="458" text-anchor="middle" class="box-body">Layer 1: fixed system prompt (~800 tokens)</text>
+  <text x="350" y="478" text-anchor="middle" class="box-body">Layer 2: chunks (deterministic order)</text>
+  <text x="350" y="498" text-anchor="middle" class="box-body">Layer 3: user query (variable)</text>
+
+  <line x1="350" y1="504" x2="350" y2="540" class="connector"/>
+  <text x="360" y="528" class="flow-label">messages[]</text>
+
+  <!-- Phase 4: LLM complete -->
+  <rect x="110" y="540" width="480" height="72" rx="18"
+        fill="url(#runtimeGrad)" stroke="#a78bfa" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="350" y="570" text-anchor="middle" class="box-title">llm_client.complete()</text>
+  <text x="350" y="594" text-anchor="middle" class="box-body">SGLang RadixAttention hits prefix cache on Layer 1+2</text>
+
+  <line x1="350" y1="612" x2="350" y2="648" class="connector"/>
+
+  <!-- Decision: parse OK? -->
+  <polygon points="350,648 430,688 350,728 270,688"
+           fill="#fff7ed" stroke="#f97316" stroke-width="2" filter="url(#shadow)"/>
+  <text x="350" y="684" text-anchor="middle" class="box-small">valid JSON?</text>
+  <text x="350" y="700" text-anchor="middle" class="box-small">parse OK?</text>
+
+  <!-- YES path -->
+  <line x1="350" y1="728" x2="350" y2="764" class="connector"/>
+  <text x="360" y="752" class="flow-label">yes</text>
+
+  <!-- Phase 5: Build response -->
+  <rect x="110" y="764" width="480" height="72" rx="18"
+        fill="url(#phase)" stroke="#cbd5e1" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="350" y="794" text-anchor="middle" class="box-title">Build DiagnosisResponse</text>
+  <text x="350" y="818" text-anchor="middle" class="box-body">evidence · confidence · latency_ms · prefix_cache_hint</text>
+
+  <line x1="350" y1="836" x2="350" y2="872" class="connector"/>
+
+  <!-- Phase 6: Audit log -->
+  <rect x="110" y="872" width="480" height="60" rx="18"
+        fill="url(#dataGrad)" stroke="#4ade80" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="350" y="900" text-anchor="middle" class="box-title">Write audit_log → MongoDB</text>
+  <text x="350" y="920" text-anchor="middle" class="box-body">session_id · tokens · latency_ms · prompt_version</text>
+
+  <line x1="350" y1="932" x2="350" y2="968" class="connector"/>
+
+  <!-- Phase 7: Return -->
+  <rect x="110" y="968" width="480" height="72" rx="18"
+        fill="url(#successGrad)" stroke="#4ade80" stroke-width="2" filter="url(#shadow)"/>
+  <text x="350" y="998" text-anchor="middle" class="box-title">Return DiagnosisResponse</text>
+  <text x="350" y="1022" text-anchor="middle" class="box-body">{ summary · suspected_causes · evidence · next_actions · confidence }</text>
+
+  <!-- REPAIR LOOP: NO path from diamond -->
+  <!-- right side of diamond → right → down → back up to LLM -->
+  <path d="M 430,688 L 620,688 L 620,556 L 590,556" class="repair-conn"/>
+  <text x="625" y="680" class="flow-label" fill="#f97316">no → repair</text>
+  <text x="625" y="696" class="flow-label" fill="#f97316">prompt</text>
+  <text x="625" y="712" class="flow-label" fill="#f97316">temp=0.0</text>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       /benchmark/run FLOW  (right lane, cx=1050)
+  ══════════════════════════════════════════════════════════════ -->
+
+  <!-- Phase 1: Client Request -->
+  <rect x="810" y="188" width="480" height="72" rx="18"
+        fill="url(#phase)" stroke="#cbd5e1" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1050" y="218" text-anchor="middle" class="box-title">Client Request</text>
+  <text x="1050" y="242" text-anchor="middle" class="box-body">POST /benchmark/run  { runs_per_condition? }</text>
+
+  <line x1="1050" y1="260" x2="1050" y2="296" class="connector"/>
+
+  <!-- Phase 2: Ensure backend ready -->
+  <rect x="810" y="296" width="480" height="60" rx="18"
+        fill="url(#search)" stroke="#fed7aa" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1050" y="326" text-anchor="middle" class="box-title">_ensure_backend_ready()</text>
+  <text x="1050" y="348" text-anchor="middle" class="box-body">GET /health on SGLang — fail fast if unavailable</text>
+
+  <line x1="1050" y1="356" x2="1050" y2="392" class="connector"/>
+
+  <!-- Phase 3: cold_start condition -->
+  <rect x="810" y="392" width="480" height="90" rx="18"
+        fill="url(#runtimeGrad)" stroke="#a78bfa" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1050" y="422" text-anchor="middle" class="box-title">cold_start  (N runs)</text>
+  <text x="1050" y="446" text-anchor="middle" class="box-body">flush_cache() before each run</text>
+  <text x="1050" y="466" text-anchor="middle" class="box-body">Same query, no prefix cache benefit</text>
+
+  <line x1="1050" y1="482" x2="1050" y2="518" class="connector"/>
+
+  <!-- Phase 4: shared_prefix condition -->
+  <rect x="810" y="518" width="480" height="90" rx="18"
+        fill="url(#packet)" stroke="#67e8f9" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1050" y="548" text-anchor="middle" class="box-title">shared_prefix  (N variant queries)</text>
+  <text x="1050" y="572" text-anchor="middle" class="box-body">Same Layer 1+2 prefix — RadixAttention hits cache</text>
+  <text x="1050" y="592" text-anchor="middle" class="box-body">Target: TTFT ≤ 60% of cold_start p50</text>
+
+  <line x1="1050" y1="608" x2="1050" y2="644" class="connector"/>
+
+  <!-- Phase 5: no_shared_prefix condition -->
+  <rect x="810" y="644" width="480" height="90" rx="18"
+        fill="url(#phase)" stroke="#cbd5e1" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1050" y="674" text-anchor="middle" class="box-title">no_shared_prefix  (control group)</text>
+  <text x="1050" y="698" text-anchor="middle" class="box-body">Unrelated queries — no prefix overlap</text>
+  <text x="1050" y="718" text-anchor="middle" class="box-body">Baseline for comparison</text>
+
+  <line x1="1050" y1="734" x2="1050" y2="770" class="connector"/>
+
+  <!-- Phase 6: Summarize -->
+  <rect x="810" y="770" width="480" height="72" rx="18"
+        fill="url(#phase)" stroke="#cbd5e1" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1050" y="800" text-anchor="middle" class="box-title">summarize_condition()</text>
+  <text x="1050" y="824" text-anchor="middle" class="box-body">p50 / p95 TTFT · tokens/s per condition</text>
+
+  <line x1="1050" y1="842" x2="1050" y2="878" class="connector"/>
+
+  <!-- Phase 7: Hypothesis -->
+  <rect x="810" y="878" width="480" height="72" rx="18"
+        fill="url(#runtimeGrad)" stroke="#a78bfa" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1050" y="908" text-anchor="middle" class="box-title">build_hypothesis_result()</text>
+  <text x="1050" y="932" text-anchor="middle" class="box-body">pass / fail vs 60% TTFT reduction target</text>
+
+  <line x1="1050" y1="950" x2="1050" y2="986" class="connector"/>
+
+  <!-- Phase 8: Persist -->
+  <rect x="810" y="986" width="480" height="60" rx="18"
+        fill="url(#dataGrad)" stroke="#4ade80" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1050" y="1016" text-anchor="middle" class="box-title">Persist to MongoDB + Redis</text>
+  <text x="1050" y="1036" text-anchor="middle" class="box-body">benchmark_runs collection · benchmark:run:{id} TTL 1h</text>
+
+  <line x1="1050" y1="1046" x2="1050" y2="1082" class="connector"/>
+
+  <!-- Phase 9: Return -->
+  <rect x="810" y="1082" width="480" height="72" rx="18"
+        fill="url(#successGrad)" stroke="#4ade80" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1050" y="1112" text-anchor="middle" class="box-title">Return BenchmarkRunResponse</text>
+  <text x="1050" y="1136" text-anchor="middle" class="box-body">{ run_id · backend · model · conditions · hypothesis_result }</text>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SHARED INFRASTRUCTURE NOTE (bottom)
+  ══════════════════════════════════════════════════════════════ -->
+  <line x1="40" y1="1200" x2="1360" y2="1200" class="divider"/>
+  <rect x="40" y="1216" width="1320" height="140" rx="16" fill="#ffffff" stroke="#e2e8f0" stroke-width="2" filter="url(#shadow)"/>
+  <text x="700" y="1248" text-anchor="middle" class="sec-title">Phase 1 Stubs — Not Active</text>
+  <text x="700" y="1274" text-anchor="middle" class="box-body">Kafka consumers/producers (shared/faultatlas/kafka/) — topics defined, not called by application code</text>
+  <text x="700" y="1296" text-anchor="middle" class="box-body">Ingestion worker runs as idle loop — document pipeline invoked synchronously from API /documents route</text>
+  <text x="700" y="1318" text-anchor="middle" class="box-body">Prometheus/Grafana overlay (infra/compose/docker-compose.obs.yml) — structured JSON logs used instead</text>
+  <text x="700" y="1340" text-anchor="middle" class="box-body">Kubernetes manifests (infra/k8s/) — Phase 3 deployment target only</text>
+
+</svg>
