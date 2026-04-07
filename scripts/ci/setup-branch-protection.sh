@@ -62,15 +62,15 @@ PAYLOAD=$(cat <<'EOF'
   "required_status_checks": {
     "strict": true,
     "contexts": [
-      "CI / Lint & Type Check",
-      "CI / Unit Tests",
-      "Requirements Format",
-      "Secrets Scan"
+      "Lint & Format",
+      "Type Check",
+      "Unit Tests",
+      "Requirement Format Check",
+      "Detect Leaked Secrets"
     ]
   },
   "enforce_admins": false,
   "required_pull_request_reviews": {
-    "dismissal_restrictions": {},
     "dismiss_stale_reviews": true,
     "require_code_owner_reviews": false,
     "required_approving_review_count": 1,
