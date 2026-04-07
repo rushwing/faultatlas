@@ -88,12 +88,14 @@ jobs:
           nohup uv run --package faultatlas-retriever uvicorn app.main:app --host 127.0.0.1 --port 8001 >/tmp/retriever.log 2>&1 &
           nohup uv run --package faultatlas-api uvicorn app.main:app --host 127.0.0.1 --port 8000 >/tmp/api.log 2>&1 &
           for i in $(seq 1 60); do
-            if curl -sf http://127.0.0.1:8000/health >/dev/null && curl -sf http://127.0.0.1:8001/health >/dev/null; then
+            if curl -sf http://127.0.0.1:8100/health >/dev/null \
+              && curl -sf http://127.0.0.1:8001/health >/dev/null \
+              && curl -sf -H "X-API-Key: $API_KEY" http://127.0.0.1:8000/ready >/dev/null; then
               exit 0
             fi
             sleep 1
           done
-          echo "API or retriever failed to start"
+          echo "API, retriever, or fake SGLang failed to become ready"
           cat /tmp/fake-sglang.log || true
           cat /tmp/retriever.log || true
           cat /tmp/api.log || true
@@ -138,11 +140,18 @@ jobs:
           nohup uv run --package faultatlas-retriever uvicorn app.main:app --host 127.0.0.1 --port 8001 >/tmp/retriever.log 2>&1 &
           nohup uv run --package faultatlas-api uvicorn app.main:app --host 127.0.0.1 --port 8000 >/tmp/api.log 2>&1 &
           for i in $(seq 1 60); do
-            if curl -sf http://127.0.0.1:8000/health >/dev/null && curl -sf http://127.0.0.1:8001/health >/dev/null; then
-              break
+            if curl -sf http://127.0.0.1:8100/health >/dev/null \
+              && curl -sf http://127.0.0.1:8001/health >/dev/null \
+              && curl -sf -H "X-API-Key: $API_KEY" http://127.0.0.1:8000/ready >/dev/null; then
+              exit 0
             fi
             sleep 1
           done
+          echo "API, retriever, or fake SGLang failed to become ready"
+          cat /tmp/fake-sglang.log || true
+          cat /tmp/retriever.log || true
+          cat /tmp/api.log || true
+          exit 1
       - name: Seed smoke document
         env:
           API_BASE: http://127.0.0.1:8000

@@ -39,18 +39,29 @@ SAMPLE_LOGS = [
 async def seed() -> None:
     async with httpx.AsyncClient(headers={"X-API-Key": API_KEY}, timeout=30.0) as client:
         for filename, content_type, content in SAMPLE_LOGS:
-            response = await client.post(
-                f"{API_BASE}/documents",
-                files={"file": (filename, content.encode(), content_type)},
-            )
+            response = None
+            for attempt in range(1, 4):
+                try:
+                    response = await client.post(
+                        f"{API_BASE}/documents",
+                        files={"file": (filename, content.encode(), content_type)},
+                    )
+                    if response.status_code < 500:
+                        break
+                except httpx.HTTPError:
+                    if attempt == 3:
+                        raise
+                await asyncio.sleep(attempt)
+
+            if response is None:
+                raise RuntimeError(f"failed to upload {filename}")
             response.raise_for_status()
             data = response.json()
             print(  # noqa: E501
                 f"Uploaded {filename} -> document_id={data['document_id']} status={data['status']}"
             )
 
-    print("\nSeed complete. Watch ingestion worker logs for processing progress.")
-    print("Kafka UI: http://localhost:8080")
+    print("\nSeed complete.")
 
 
 if __name__ == "__main__":
