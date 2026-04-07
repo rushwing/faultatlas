@@ -55,6 +55,9 @@ async def seed() -> None:
 
             if response is None:
                 raise RuntimeError(f"failed to upload {filename}")
+            if response.status_code == 409:
+                print(f"Skipped {filename} -> duplicate document already submitted")
+                continue
             response.raise_for_status()
             data = response.json()
             print(  # noqa: E501

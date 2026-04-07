@@ -27,6 +27,14 @@ async def vector_search(
     if top_k <= 0:
         return []
 
+    existing_chunk = await db["chunks"].find_one(
+        {"embedding": {"$exists": True}},
+        {"_id": 1},
+    )
+    if existing_chunk is None:
+        logger.debug("vector search skipped because no embedded chunks exist yet")
+        return []
+
     if should_use_local_embeddings(openai_api_key):
         query_vector = embed_text_locally(query)
     else:
