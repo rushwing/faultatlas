@@ -35,10 +35,14 @@ cd "$REPO_ROOT"
 
 # ── Config (override via env) ─────────────────────────────────────────────────
 MODEL_NAME="${MODEL_NAME:-Qwen/Qwen2.5-7B-Instruct}"
-MODEL_DIR="${MODEL_DIR:-/root/models}"
+# Default to autodl-tmp (large data disk on AutoDL) to avoid filling root overlay
+MODEL_DIR="${MODEL_DIR:-/root/autodl-tmp/models}"
 SGLANG_PORT="${SGLANG_PORT:-8100}"
 SGLANG_MEM_FRACTION="${SGLANG_MEM_FRACTION:-0.88}"
 COMPOSE_FILE="infra/compose/docker-compose.yml"
+
+# Redirect uv download cache to large disk — CUDA wheels are several GB
+export UV_CACHE_DIR="${UV_CACHE_DIR:-/root/autodl-tmp/.uv-cache}"
 
 # Detect whether Docker daemon is reachable (not available in AutoDL containers)
 docker_available() { docker info &>/dev/null; }
