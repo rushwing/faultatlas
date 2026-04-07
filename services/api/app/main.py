@@ -1,12 +1,11 @@
 import logging
-import sys
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
 from .middleware.logging import setup_logging
-from .routers import health, ingest, query, incidents
+from .routers import health, incidents, ingest, query
 
 settings = get_settings()
 setup_logging(settings.log_level)
@@ -42,5 +41,6 @@ async def startup() -> None:
 @app.on_event("shutdown")
 async def shutdown() -> None:
     from faultatlas.mongo.client import close_client
+
     await close_client()
     logger.info("faultatlas api shutdown complete")

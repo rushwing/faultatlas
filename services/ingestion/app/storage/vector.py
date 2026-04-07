@@ -1,7 +1,7 @@
 import logging
-from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from faultatlas.mongo.client import Collections
+from motor.motor_asyncio import AsyncIOMotorDatabase
 
 logger = logging.getLogger(__name__)
 

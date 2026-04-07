@@ -1,11 +1,12 @@
-import time
 import logging
+import time
+
 from openai import AsyncOpenAI
 from redis.asyncio import Redis
 
-from .prompts import SYSTEM_PROMPT, RAG_PROMPT
-from .tools import retrieve_context
 from ..config import Settings
+from .prompts import RAG_PROMPT, SYSTEM_PROMPT
+from .tools import retrieve_context
 
 logger = logging.getLogger(__name__)
 

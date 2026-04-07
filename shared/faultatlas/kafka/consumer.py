@@ -1,19 +1,23 @@
 import json
 import logging
 from collections.abc import Callable
-from confluent_kafka import Consumer as ConfluentConsumer, KafkaError, KafkaException
+
+from confluent_kafka import Consumer as ConfluentConsumer
+from confluent_kafka import KafkaError, KafkaException
 
 logger = logging.getLogger(__name__)
 
 
 class KafkaConsumer:
     def __init__(self, bootstrap_servers: str, group_id: str, topics: list[str]) -> None:
-        self._consumer = ConfluentConsumer({
-            "bootstrap.servers": bootstrap_servers,
-            "group.id": group_id,
-            "auto.offset.reset": "earliest",
-            "enable.auto.commit": False,
-        })
+        self._consumer = ConfluentConsumer(
+            {
+                "bootstrap.servers": bootstrap_servers,
+                "group.id": group_id,
+                "auto.offset.reset": "earliest",
+                "enable.auto.commit": False,
+            }
+        )
         self._consumer.subscribe(topics)
         self._running = False
 
@@ -26,12 +30,13 @@ class KafkaConsumer:
                 if msg is None:
                     continue
                 if msg.error():
-                    if msg.error().code() == KafkaError._PARTITION_EOF:
+                    err = msg.error()
+                    if err.code() == KafkaError._PARTITION_EOF:  # type: ignore[union-attr]
                         continue
-                    raise KafkaException(msg.error())
+                    raise KafkaException(err)
                 try:
-                    payload = json.loads(msg.value().decode("utf-8"))
-                    handler(msg.topic(), payload)
+                    payload = json.loads(msg.value().decode("utf-8"))  # type: ignore[union-attr]
+                    handler(msg.topic(), payload)  # type: ignore[arg-type]
                     self._consumer.commit(message=msg)
                 except Exception:
                     logger.exception("handler failed", extra={"topic": msg.topic()})

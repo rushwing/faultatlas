@@ -15,18 +15,18 @@ import asyncio
 import json
 import os
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
-from datetime import datetime, UTC
 
 import httpx
+from datasets import Dataset
 from ragas import evaluate
 from ragas.metrics import (
+    answer_relevancy,
     context_precision,
     context_recall,
     faithfulness,
-    answer_relevancy,
 )
-from datasets import Dataset
 
 REPO_ROOT = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
@@ -80,16 +80,19 @@ async def build_ragas_dataset(golden: list[dict], smoke: bool = False) -> Datase
                 f"The incident involves {', '.join(case['expected_chunk_keywords'])}."
             )
 
-    return Dataset.from_dict({
-        "question": questions,
-        "answer": answers,
-        "contexts": contexts,
-        "ground_truth": ground_truths,
-    })
+    return Dataset.from_dict(
+        {
+            "question": questions,
+            "answer": answers,
+            "contexts": contexts,
+            "ground_truth": ground_truths,
+        }
+    )
 
 
 def load_thresholds() -> dict:
     import yaml
+
     with open(THRESHOLDS_PATH) as f:
         return yaml.safe_load(f)["rag"]
 
@@ -97,7 +100,8 @@ def load_thresholds() -> dict:
 def run_eval(smoke: bool = False) -> dict:
     golden = json.loads(GOLDEN_PATH.read_text())
 
-    print(f"Building RAGAS dataset from {len(golden)} golden queries{'  (smoke: 3 only)' if smoke else ''}...")
+    smoke_note = "  (smoke: 3 only)" if smoke else ""
+    print(f"Building RAGAS dataset from {len(golden)} golden queries{smoke_note}...")
     dataset = asyncio.run(build_ragas_dataset(golden, smoke=smoke))
 
     print("Running RAGAS evaluation...")
@@ -135,7 +139,8 @@ def run_eval(smoke: bool = False) -> dict:
         "thresholds": thresholds,
         "passed": passed,
     }
-    report_path = REPO_ROOT / f"harness/reports/rag_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}.json"
+    ts = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+    report_path = REPO_ROOT / f"harness/reports/rag_{ts}.json"
     report_path.parent.mkdir(exist_ok=True)
     report_path.write_text(json.dumps(report, indent=2))
     print(f"\n  Report saved: {report_path.relative_to(REPO_ROOT)}")

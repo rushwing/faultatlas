@@ -1,10 +1,12 @@
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any
+
 from pydantic import BaseModel, Field
 
 
 class AgentRequested(BaseModel):
     """Published to: faultatlas.agent.requested"""
+
     event_type: str = "agent.requested"
     session_id: str
     query: str
@@ -16,6 +18,7 @@ class AgentRequested(BaseModel):
 
 class AgentCompleted(BaseModel):
     """Published to: faultatlas.agent.completed"""
+
     event_type: str = "agent.completed"
     session_id: str
     answer: str

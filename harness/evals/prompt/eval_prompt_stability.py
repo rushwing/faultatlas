@@ -21,12 +21,11 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import hashlib
 import json
 import os
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
-from datetime import datetime, UTC
 
 import httpx
 
@@ -50,6 +49,7 @@ STABILITY_QUERIES = [
 
 def load_thresholds() -> dict:
     import yaml
+
     with open(THRESHOLDS_PATH) as f:
         return yaml.safe_load(f)["prompt"]
 
@@ -86,9 +86,9 @@ async def run_stability_check(runs: int = 20) -> dict:
                 data = await fetch_prompt_debug(client, query)
                 hashes.append(data["layer1_hash"])
                 if i % 5 == 0:
-                    print(f"  Run {i+1}/{runs}: layer1_hash={data['layer1_hash'][:12]}...")
+                    print(f"  Run {i + 1}/{runs}: layer1_hash={data['layer1_hash'][:12]}...")
             except Exception as e:
-                print(f"  Run {i+1} FAILED: {e}")
+                print(f"  Run {i + 1} FAILED: {e}")
                 hashes.append(f"ERROR:{e}")
 
     unique_hashes = set(hashes)
@@ -116,6 +116,7 @@ def compare_to_baseline(current_scores: dict, baseline_path: Path) -> dict:
     delta = current_faithfulness - baseline_faithfulness
 
     import yaml
+
     thresholds = yaml.safe_load(THRESHOLDS_PATH.read_text())["prompt"]
     threshold = thresholds.get("regression_threshold", 0.05)
 
@@ -146,10 +147,13 @@ def run_eval(mode: str, baseline_path: str | None = None, version: str = "v1") -
         passed = result["stable"]
         score = result["score"]
 
-        print(f"\n── Prompt Stability Results ──────────────────────────────")
-        print(f"  layer1_stability: {score:.3f}  (threshold: {thresholds['layer1_stability']:.2f})  "
-              f"[{'PASS' if passed else 'FAIL'}]")
-        print(f"──────────────────────────────────────────────────────────")
+        print("\n── Prompt Stability Results ──────────────────────────────")
+        threshold = thresholds["layer1_stability"]
+        print(
+            f"  layer1_stability: {score:.3f}  (threshold: {threshold:.2f})  "
+            f"[{'PASS' if passed else 'FAIL'}]"
+        )
+        print("──────────────────────────────────────────────────────────")
         print(f"  Overall: {'PASS' if passed else 'FAIL'}")
 
         report.update(result)
@@ -162,19 +166,21 @@ def run_eval(mode: str, baseline_path: str | None = None, version: str = "v1") -
 
         # Run a quick RAG eval to get current faithfulness score
         from harness.evals.rag.eval_retrieval import run_eval as run_rag_eval
+
         rag_report = run_rag_eval(smoke=True)
         comparison = compare_to_baseline(rag_report["scores"], Path(baseline_path))
 
-        print(f"\n── Prompt Regression Results ─────────────────────────────")
+        print("\n── Prompt Regression Results ─────────────────────────────")
         print(f"  {comparison['verdict']}")
-        print(f"  ['PASS' if comparison['passed'] else 'FAIL']")
-        print(f"──────────────────────────────────────────────────────────")
+        print("  ['PASS' if comparison['passed'] else 'FAIL']")
+        print("──────────────────────────────────────────────────────────")
 
         report.update(comparison)
         report["passed"] = comparison["passed"]
 
     elif mode == "save-baseline":
         from harness.evals.rag.eval_retrieval import run_eval as run_rag_eval
+
         rag_report = run_rag_eval(smoke=False)
         baseline = {
             "version": version,
@@ -187,7 +193,8 @@ def run_eval(mode: str, baseline_path: str | None = None, version: str = "v1") -
         report["saved_to"] = str(baseline_out)
         report["passed"] = True
 
-    report_path = REPO_ROOT / f"harness/reports/prompt_{mode}_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}.json"
+    ts = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+    report_path = REPO_ROOT / f"harness/reports/prompt_{mode}_{ts}.json"
     report_path.parent.mkdir(exist_ok=True)
     report_path.write_text(json.dumps(report, indent=2))
     print(f"\n  Report saved: {report_path.relative_to(REPO_ROOT)}")
@@ -197,8 +204,9 @@ def run_eval(mode: str, baseline_path: str | None = None, version: str = "v1") -
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", choices=["stability", "regression", "save-baseline"],
-                        default="stability")
+    parser.add_argument(
+        "--mode", choices=["stability", "regression", "save-baseline"], default="stability"
+    )
     parser.add_argument("--baseline", help="Path to baseline JSON for regression mode")
     parser.add_argument("--version", default="v1", help="Version tag for save-baseline mode")
     args = parser.parse_args()

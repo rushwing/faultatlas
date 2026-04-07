@@ -1,10 +1,12 @@
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any
+
 from pydantic import BaseModel, Field
 
 
 class DocumentUploaded(BaseModel):
     """Published to: faultatlas.documents.uploaded"""
+
     event_type: str = "document.uploaded"
     document_id: str
     filename: str
@@ -17,6 +19,7 @@ class DocumentUploaded(BaseModel):
 
 class DocumentIndexed(BaseModel):
     """Published to: faultatlas.index.updated"""
+
     event_type: str = "document.indexed"
     document_id: str
     chunk_count: int

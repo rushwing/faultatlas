@@ -27,4 +27,5 @@ async def health() -> dict:
 @app.on_event("shutdown")
 async def shutdown() -> None:
     from faultatlas.mongo.client import close_client
+
     await close_client()
