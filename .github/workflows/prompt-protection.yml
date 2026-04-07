@@ -21,7 +21,7 @@ jobs:
       - name: Check prompt baseline exists
         id: baseline-check
         run: |
-          BASELINE="harness/reports/prompt_baseline_v1.json"
+          BASELINE="harness/reports/prompt_baseline_v2.json"
           if [[ ! -f "$BASELINE" ]]; then
             echo "has_baseline=false" >> "$GITHUB_OUTPUT"
           else
@@ -33,7 +33,7 @@ jobs:
         run: |
           echo "::error::prompts.py was changed but no eval baseline exists."
           echo "::error::Run: make eval-prompt-baseline"
-          echo "::error::Then commit harness/reports/prompt_baseline_v1.json before this PR."
+          echo "::error::Then commit harness/reports/prompt_baseline_v2.json before this PR."
           exit 1
 
       - name: Require eval note in PR description
@@ -60,7 +60,7 @@ jobs:
                 "Before merging, verify:",
                 "- [ ] `make eval-prompt-regression` passes (faithfulness delta ≤ 5 points)",
                 "- [ ] `make eval-prompt` passes (Layer 1 stability = 1.00)",
-                "- [ ] `harness/reports/prompt_baseline_v1.json` updated to new baseline",
+                "- [ ] `harness/reports/prompt_baseline_v2.json` updated to new baseline",
                 "",
                 "See `docs/adr/ADR-004-eval-strategy.md` for the full process."
               ].join("\n")
