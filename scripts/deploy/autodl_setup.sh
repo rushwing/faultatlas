@@ -40,6 +40,9 @@ SGLANG_PORT="${SGLANG_PORT:-8100}"
 SGLANG_MEM_FRACTION="${SGLANG_MEM_FRACTION:-0.88}"
 COMPOSE_FILE="infra/compose/docker-compose.yml"
 
+# Detect whether Docker daemon is reachable (not available in AutoDL containers)
+docker_available() { docker info &>/dev/null; }
+
 # =============================================================================
 section "Step 1 — Environment check"
 # =============================================================================
@@ -203,29 +206,74 @@ grep -q "^MODEL_PATH=" .env && \
 section "Step 5 — Start infrastructure (MongoDB + Redis)"
 # =============================================================================
 
-info "Starting MongoDB and Redis..."
-docker compose -f "$COMPOSE_FILE" up mongo redis -d
+if docker_available; then
+  info "Starting MongoDB and Redis via Docker Compose..."
+  docker compose -f "$COMPOSE_FILE" up mongo redis -d
 
-info "Waiting for MongoDB to be healthy..."
-for i in {1..30}; do
-  if docker compose -f "$COMPOSE_FILE" exec -T mongo \
-    mongosh --eval "db.adminCommand('ping')" &>/dev/null; then
-    info "MongoDB ready"
-    break
-  fi
-  [[ $i -eq 30 ]] && error "MongoDB failed to start after 30 seconds"
-  sleep 1
-done
+  info "Waiting for MongoDB to be healthy..."
+  for i in {1..30}; do
+    if docker compose -f "$COMPOSE_FILE" exec -T mongo \
+      mongosh --eval "db.adminCommand('ping')" &>/dev/null; then
+      info "MongoDB ready"
+      break
+    fi
+    [[ $i -eq 30 ]] && error "MongoDB failed to start after 30 seconds"
+    sleep 1
+  done
 
-info "Waiting for Redis to be healthy..."
-for i in {1..20}; do
-  if docker compose -f "$COMPOSE_FILE" exec -T redis redis-cli ping &>/dev/null; then
-    info "Redis ready"
-    break
+  info "Waiting for Redis to be healthy..."
+  for i in {1..20}; do
+    if docker compose -f "$COMPOSE_FILE" exec -T redis redis-cli ping &>/dev/null; then
+      info "Redis ready"
+      break
+    fi
+    [[ $i -eq 20 ]] && error "Redis failed to start after 20 seconds"
+    sleep 1
+  done
+else
+  warn "Docker daemon not available — starting MongoDB and Redis natively"
+
+  # MongoDB
+  if ! command -v mongod &>/dev/null; then
+    info "Installing MongoDB 7..."
+    curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | \
+      gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg
+    echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] \
+      https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" \
+      > /etc/apt/sources.list.d/mongodb-org-7.0.list
+    apt-get update -q && apt-get install -y mongodb-org
   fi
-  [[ $i -eq 20 ]] && error "Redis failed to start after 20 seconds"
-  sleep 1
-done
+  mkdir -p /var/lib/mongodb /var/log/mongodb
+  if ! mongosh --eval "db.adminCommand('ping')" &>/dev/null; then
+    mongod --fork --logpath /var/log/mongodb/mongod.log --dbpath /var/lib/mongodb
+    for i in {1..20}; do
+      mongosh --eval "db.adminCommand('ping')" &>/dev/null && break
+      [[ $i -eq 20 ]] && error "MongoDB failed to start"
+      sleep 1
+    done
+  fi
+  info "MongoDB ready"
+
+  # Redis
+  if ! command -v redis-server &>/dev/null; then
+    info "Installing Redis..."
+    apt-get install -y redis-server
+  fi
+  if ! redis-cli ping &>/dev/null; then
+    redis-server --daemonize yes --logfile /var/log/redis.log
+    for i in {1..10}; do
+      redis-cli ping &>/dev/null && break
+      [[ $i -eq 10 ]] && error "Redis failed to start"
+      sleep 1
+    done
+  fi
+  info "Redis ready"
+
+  # Update .env to use localhost instead of Docker service names
+  sed -i "s|^MONGO_URI=.*|MONGO_URI=mongodb://localhost:27017|" .env
+  sed -i "s|^REDIS_URL=.*|REDIS_URL=redis://localhost:6379/0|" .env
+  info "Updated .env: MONGO_URI and REDIS_URL → localhost"
+fi
 
 # =============================================================================
 section "Step 6 — Start SGLang model server"
@@ -275,18 +323,51 @@ fi
 section "Step 7 — Start FaultAtlas services"
 # =============================================================================
 
-info "Starting API and Retriever services..."
-docker compose -f "$COMPOSE_FILE" up api retriever ingestion -d --build
+LOG_DIR="${REPO_ROOT}/logs"
+mkdir -p "$LOG_DIR"
 
-info "Waiting for API to be ready..."
-for i in {1..30}; do
-  if curl -sf "http://localhost:8000/health" &>/dev/null; then
-    info "API ready at http://localhost:8000"
-    break
-  fi
-  [[ $i -eq 30 ]] && error "API failed to start. Check: docker compose -f ${COMPOSE_FILE} logs api"
-  sleep 2
-done
+if docker_available; then
+  info "Starting API, Retriever, and Ingestion via Docker Compose..."
+  docker compose -f "$COMPOSE_FILE" up api retriever ingestion -d --build
+
+  info "Waiting for API to be ready..."
+  for i in {1..30}; do
+    if curl -sf "http://localhost:8000/health" &>/dev/null; then
+      info "API ready at http://localhost:8000"
+      break
+    fi
+    [[ $i -eq 30 ]] && error "API failed to start. Check: docker compose -f ${COMPOSE_FILE} logs api"
+    sleep 2
+  done
+else
+  info "Starting API, Retriever, and Ingestion natively via uv..."
+
+  nohup uv run --package faultatlas-api uvicorn app.main:app \
+    --host 0.0.0.0 --port 8000 \
+    > "$LOG_DIR/api.log" 2>&1 &
+  echo $! > "$LOG_DIR/api.pid"
+
+  nohup uv run --package faultatlas-retriever uvicorn app.main:app \
+    --host 0.0.0.0 --port 8001 \
+    > "$LOG_DIR/retriever.log" 2>&1 &
+  echo $! > "$LOG_DIR/retriever.pid"
+
+  nohup uv run --package faultatlas-ingestion uvicorn app.main:app \
+    --host 0.0.0.0 --port 8002 \
+    > "$LOG_DIR/ingestion.log" 2>&1 &
+  echo $! > "$LOG_DIR/ingestion.pid"
+
+  info "Waiting for API to be ready..."
+  for i in {1..30}; do
+    if curl -sf "http://localhost:8000/health" &>/dev/null; then
+      info "API ready at http://localhost:8000"
+      break
+    fi
+    [[ $i -eq 30 ]] && error "API failed to start. Check: $LOG_DIR/api.log"
+    sleep 2
+  done
+  info "Logs: $LOG_DIR/{api,retriever,ingestion}.log"
+fi
 
 # =============================================================================
 section "Step 8 — Seed knowledge base"
