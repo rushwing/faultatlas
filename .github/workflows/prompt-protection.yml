@@ -1,0 +1,61 @@
+name: Prompt Protection
+
+on:
+  pull_request:
+    paths:
+      - "services/api/app/agents/prompts.py"
+      - "services/api/app/agents/prompt_builder.py"
+
+jobs:
+  prompt-change-gate:
+    name: Prompt Change Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check prompt baseline exists
+        id: baseline-check
+        run: |
+          BASELINE="harness/reports/prompt_baseline_v1.json"
+          if [[ ! -f "$BASELINE" ]]; then
+            echo "has_baseline=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_baseline=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Block if no baseline saved
+        if: steps.baseline-check.outputs.has_baseline == 'false'
+        run: |
+          echo "::error::prompts.py was changed but no eval baseline exists."
+          echo "::error::Run: make eval-prompt-baseline"
+          echo "::error::Then commit harness/reports/prompt_baseline_v1.json before this PR."
+          exit 1
+
+      - name: Require eval note in PR description
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          python3 scripts/ci/check-prompt-change.py \
+            --pr-body "$PR_BODY" \
+            --changed-files "services/api/app/agents/prompts.py"
+
+      - name: Annotate PR with prompt change warning
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: [
+                "⚠️ **Prompt change detected** in this PR.",
+                "",
+                "Before merging, verify:",
+                "- [ ] `make eval-prompt-regression` passes (faithfulness delta ≤ 5 points)",
+                "- [ ] `make eval-prompt` passes (Layer 1 stability = 1.00)",
+                "- [ ] `harness/reports/prompt_baseline_v1.json` updated to new baseline",
+                "",
+                "See `docs/adr/ADR-004-eval-strategy.md` for the full process."
+              ].join("\n")
+            })

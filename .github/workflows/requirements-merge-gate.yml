@@ -1,0 +1,60 @@
+name: Requirements Merge Gate
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, edited, ready_for_review]
+
+permissions:
+  contents: write
+  pull-requests: read
+  checks: write
+
+jobs:
+  requirements-merge-gate:
+    name: requirements-merge-gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Evaluate linked requirement status
+        id: gate
+        run: |
+          python3 scripts/ci/check-requirements-merge-gate.py \
+            --event-path "$GITHUB_EVENT_PATH" \
+            --github-output "$GITHUB_OUTPUT" \
+            --autofix
+
+      - name: Commit auto-advanced requirement status
+        if: steps.gate.outputs.autofixed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tasks/active tasks/done
+          git commit -m "ci: auto-advance requirement status on merge [skip ci]"
+          git push
+
+      - name: Publish check result on updated SHA
+        if: steps.gate.outputs.autofixed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NEW_SHA="$(git rev-parse HEAD)"
+          SUMMARY="${{ steps.gate.outputs.summary }}"
+          gh api "repos/${{ github.repository }}/check-runs" \
+            --method POST \
+            --input - <<EOF
+          {
+            "name": "requirements-merge-gate",
+            "head_sha": "${NEW_SHA}",
+            "status": "completed",
+            "conclusion": "success",
+            "output": {
+              "title": "requirements-merge-gate",
+              "summary": "${SUMMARY}"
+            }
+          }
+          EOF
