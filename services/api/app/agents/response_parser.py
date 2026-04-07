@@ -7,6 +7,11 @@ from ..llm.errors import LLMOutputParseError
 from ..schemas.diagnosis import DiagnosisLLMOutput
 
 _CODE_FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL)
+_THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
+
+
+def _strip_think_tags(content: str) -> str:
+    return _THINK_RE.sub("", content).strip()
 
 
 def _extract_json_block(content: str) -> str:
@@ -22,6 +27,7 @@ def _extract_json_block(content: str) -> str:
 
 
 def parse_diagnosis_output(content: str) -> DiagnosisLLMOutput:
+    content = _strip_think_tags(content)
     json_block = _extract_json_block(content)
     try:
         payload = json.loads(json_block)
