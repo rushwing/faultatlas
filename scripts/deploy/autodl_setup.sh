@@ -201,6 +201,8 @@ fi
 sed -i "s|^SGLANG_BASE_URL=.*|SGLANG_BASE_URL=http://localhost:${SGLANG_PORT}/v1|" .env
 sed -i "s|^LLM_BACKEND=.*|LLM_BACKEND=sglang|" .env
 sed -i "s|^MODEL_NAME=.*|MODEL_NAME=${MODEL_NAME}|" .env
+# When running natively (no Docker), service names like 'retriever' won't resolve
+sed -i "s|^RETRIEVER_URL=.*|RETRIEVER_URL=http://localhost:8001|" .env
 
 # =============================================================================
 section "Step 4 — Download model weights"
