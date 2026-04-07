@@ -183,9 +183,20 @@ mkdir -p "$MODEL_DIR"
 
 MODEL_LOCAL_PATH="${MODEL_DIR}/$(echo "$MODEL_NAME" | tr '/' '__')"
 
-if [[ -d "$MODEL_LOCAL_PATH" ]]; then
-  info "Model already downloaded at ${MODEL_LOCAL_PATH}"
+# Verify model integrity: config.json must exist and at least one safetensors shard
+# must be present and non-empty. snapshot_download is resumable so re-running is safe.
+model_complete() {
+  local path="$1"
+  [[ -f "${path}/config.json" ]] && \
+  [[ -s "${path}/config.json" ]] && \
+  ls "${path}"/*.safetensors &>/dev/null 2>&1 && \
+  [[ $(find "${path}" -name "*.safetensors" -size +100M | wc -l) -gt 0 ]]
+}
+
+if model_complete "$MODEL_LOCAL_PATH"; then
+  info "Model already complete at ${MODEL_LOCAL_PATH}"
 else
+  [[ -d "$MODEL_LOCAL_PATH" ]] && warn "Incomplete model found — resuming download..."
   info "Downloading ${MODEL_NAME} to ${MODEL_LOCAL_PATH}..."
   info "This may take 10–20 minutes on AutoDL (model is ~15 GB)."
 
@@ -205,6 +216,7 @@ snapshot_download(
 print(f"Download complete: {local_path}")
 PYEOF
 
+  model_complete "$MODEL_LOCAL_PATH" || error "Model download appears incomplete. Check disk space and retry."
   info "Model downloaded: ${MODEL_LOCAL_PATH}"
 fi
 
