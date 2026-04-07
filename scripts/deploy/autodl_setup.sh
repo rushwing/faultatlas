@@ -76,11 +76,11 @@ fi
 section "Step 2 — Install dependencies"
 # =============================================================================
 
-# uv
+# uv — add to PATH first so repeated runs find the existing binary
+export PATH="$HOME/.local/bin:$PATH"
 if ! command -v uv &>/dev/null; then
   info "Installing uv..."
   curl -LsSf https://astral.sh/uv/install.sh | sh
-  export PATH="$HOME/.local/bin:$PATH"
   info "uv installed: $(uv --version)"
 else
   info "uv: $(uv --version)"
@@ -130,11 +130,18 @@ else
 fi
 
 # Python deps for model download + SGLang
-if [[ -d "${REPO_ROOT}/.venv" ]]; then
-  info "Python virtualenv already exists — skipping uv sync"
+# Use lockfile hash to detect whether sync is needed, avoiding re-sync on reruns
+# while still catching partial/interrupted syncs correctly.
+LOCK_HASH_FILE="${REPO_ROOT}/.venv/.uv_lock_hash"
+CURRENT_LOCK_HASH=$(sha256sum "${REPO_ROOT}/uv.lock" | awk '{print $1}')
+if [[ -d "${REPO_ROOT}/.venv" ]] && \
+   [[ -f "$LOCK_HASH_FILE" ]] && \
+   [[ "$(cat "$LOCK_HASH_FILE")" == "$CURRENT_LOCK_HASH" ]]; then
+  info "Python dependencies up to date — skipping uv sync"
 else
   info "Installing Python workspace dependencies..."
   uv sync --all-packages
+  echo "$CURRENT_LOCK_HASH" > "$LOCK_HASH_FILE"
 fi
 
 # =============================================================================
