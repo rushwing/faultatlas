@@ -98,7 +98,7 @@
   <text x="88" y="286" class="box-body">• POST /diagnose — RAG agent endpoint</text>
   <text x="88" y="308" class="box-body">• POST /documents — sync ingestion pipeline</text>
   <text x="88" y="330" class="box-body">• POST /benchmark/run — TTFT benchmark runner</text>
-  <text x="88" y="352" class="box-body">• GET  /query — pass-through vector search</text>
+  <text x="88" y="352" class="box-body">• POST /query — deprecated alias for /diagnose</text>
   <!-- bullets col 2 -->
   <text x="620" y="286" class="box-body">• GET  /incidents — incident records</text>
   <text x="620" y="308" class="box-body">• GET  /health — liveness probe</text>
@@ -106,7 +106,7 @@
   <text x="620" y="352" class="box-body">• Structured JSON logging</text>
   <!-- bullets col 3 -->
   <text x="1140" y="286" class="box-body">• Session management via Redis TTL 30m</text>
-  <text x="1140" y="308" class="box-body">• Audit log writes to MongoDB</text>
+  <text x="1140" y="308" class="box-body">• Writes agent_sessions + citations to MongoDB</text>
   <text x="1140" y="330" class="box-body">• LLM_BACKEND switchable at runtime</text>
   <text x="1140" y="352" class="box-body">• DiagnosisResponse schema is stable</text>
   <!-- pills -->

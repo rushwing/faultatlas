@@ -16,7 +16,7 @@
 │  Routers                                                                        │
 │  ├── POST /documents          → ingest.py       (sync HTTP pipeline)            │
 │  ├── POST /diagnose           → diagnose.py     (RAG agent)                     │
-│  ├── GET  /query              → query.py        (pass-through search)           │
+│  ├── POST /query              → query.py        (deprecated alias for /diagnose) │
 │  ├── POST /benchmark/run      → benchmark.py    (TTFT benchmark)                │
 │  ├── GET  /incidents          → incidents.py                                    │
 │  └── GET  /health             → health.py                                       │
@@ -121,7 +121,7 @@
 ## Request flow: POST /diagnose
 
   Client
-    │  POST /diagnose  { query, session_id }
+    │  POST /diagnose  { query, user_id? }   ← session_id is server-generated, not a client input
     ▼
   API :8000
     │  retrieve_context(query)
@@ -145,7 +145,8 @@
     ▼
   API :8000
     │  parse_diagnosis_output()
-    │  write audit_log → MongoDB
+    │  write agent_sessions → MongoDB
+    │  write citations → MongoDB  (only when evidence present)
     │  return DiagnosisResponse
     ▼
   Client

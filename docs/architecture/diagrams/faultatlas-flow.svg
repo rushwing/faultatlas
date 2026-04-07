@@ -99,7 +99,7 @@
   <rect x="110" y="188" width="480" height="72" rx="18"
         fill="url(#phase)" stroke="#cbd5e1" stroke-width="1.5" filter="url(#shadow)"/>
   <text x="350" y="218" text-anchor="middle" class="box-title">Client Request</text>
-  <text x="350" y="242" text-anchor="middle" class="box-body">POST /diagnose  { query, session_id }</text>
+  <text x="350" y="242" text-anchor="middle" class="box-body">POST /diagnose  { query, user_id? }  — session_id generated server-side</text>
 
   <line x1="350" y1="260" x2="350" y2="296" class="connector"/>
   <text x="360" y="284" class="flow-label">route</text>
@@ -153,8 +153,8 @@
   <!-- Phase 6: Audit log -->
   <rect x="110" y="872" width="480" height="60" rx="18"
         fill="url(#dataGrad)" stroke="#4ade80" stroke-width="1.5" filter="url(#shadow)"/>
-  <text x="350" y="900" text-anchor="middle" class="box-title">Write audit_log → MongoDB</text>
-  <text x="350" y="920" text-anchor="middle" class="box-body">session_id · tokens · latency_ms · prompt_version</text>
+  <text x="350" y="900" text-anchor="middle" class="box-title">Write to MongoDB</text>
+  <text x="350" y="920" text-anchor="middle" class="box-body">agent_sessions (always) · citations (if evidence present)</text>
 
   <line x1="350" y1="932" x2="350" y2="968" class="connector"/>
 
