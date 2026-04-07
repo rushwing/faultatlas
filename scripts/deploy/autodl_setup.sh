@@ -147,7 +147,19 @@ fi
 # SGLang — GPU-only dep, not in pyproject.toml, install separately
 if ! uv run python -c "import sglang" &>/dev/null; then
   info "Installing SGLang (GPU-only, not in workspace deps)..."
-  uv pip install "sglang[all]"
+  # Use Tsinghua mirror for speed; keep PyPI as fallback for packages not yet mirrored
+  SGLANG_INSTALL_ARGS=(
+    "sglang[all]"
+    "--index-url" "https://pypi.tuna.tsinghua.edu.cn/simple"
+    "--extra-index-url" "https://pypi.org/simple"
+  )
+  for attempt in 1 2 3; do
+    info "  Install attempt ${attempt}/3..."
+    uv pip install "${SGLANG_INSTALL_ARGS[@]}" && break
+    [[ $attempt -eq 3 ]] && error "SGLang install failed after 3 attempts. Check network/proxy."
+    warn "  Attempt ${attempt} failed, retrying in 5s..."
+    sleep 5
+  done
 else
   info "SGLang: already installed"
 fi
