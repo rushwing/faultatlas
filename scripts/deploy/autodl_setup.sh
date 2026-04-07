@@ -107,7 +107,10 @@ docker compose version &>/dev/null || error "Docker Compose not available. Check
 info "Docker Compose: $(docker compose version --short)"
 
 # NVIDIA Container Toolkit (for GPU in Docker)
-if ! dpkg -l | grep -q nvidia-container-toolkit 2>/dev/null; then
+# Skip if running inside a container — GPU passthrough is handled by the host (e.g. AutoDL)
+if [ -f /.dockerenv ] || grep -q 'docker\|lxc' /proc/1/cgroup 2>/dev/null; then
+  info "Running inside a container — skipping NVIDIA Container Toolkit install (GPU passthrough handled by host)"
+elif ! dpkg -l | grep -q nvidia-container-toolkit 2>/dev/null; then
   info "Installing NVIDIA Container Toolkit..."
   curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
     gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
@@ -117,7 +120,7 @@ if ! dpkg -l | grep -q nvidia-container-toolkit 2>/dev/null; then
   apt-get update -q
   apt-get install -y nvidia-container-toolkit
   nvidia-ctk runtime configure --runtime=docker
-  systemctl restart docker
+  service docker restart 2>/dev/null || true
   info "NVIDIA Container Toolkit installed"
 else
   info "NVIDIA Container Toolkit: already installed"
