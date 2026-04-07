@@ -10,7 +10,7 @@ services:
       - ../../shared:/app/shared
     command: >
       uv run --package faultatlas-api
-      uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      uvicorn app.main:app --app-dir services/api --host 0.0.0.0 --port 8000 --reload
 
   ingestion:
     volumes:
@@ -25,4 +25,4 @@ services:
       - ../../shared:/app/shared
     command: >
       uv run --package faultatlas-retriever
-      uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+      uvicorn app.main:app --app-dir services/retriever --host 0.0.0.0 --port 8001 --reload

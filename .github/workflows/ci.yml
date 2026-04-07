@@ -85,8 +85,8 @@ jobs:
           RETRIEVER_URL: http://127.0.0.1:8001
         run: |
           nohup uv run python tests/fake_sglang_server.py >/tmp/fake-sglang.log 2>&1 &
-          nohup uv run --package faultatlas-retriever uvicorn app.main:app --host 127.0.0.1 --port 8001 >/tmp/retriever.log 2>&1 &
-          nohup uv run --package faultatlas-api uvicorn app.main:app --host 127.0.0.1 --port 8000 >/tmp/api.log 2>&1 &
+          nohup uv run --package faultatlas-retriever uvicorn app.main:app --app-dir services/retriever --host 127.0.0.1 --port 8001 >/tmp/retriever.log 2>&1 &
+          nohup uv run --package faultatlas-api uvicorn app.main:app --app-dir services/api --host 127.0.0.1 --port 8000 >/tmp/api.log 2>&1 &
           for i in $(seq 1 60); do
             if curl -sf http://127.0.0.1:8100/health >/dev/null \
               && curl -sf http://127.0.0.1:8001/health >/dev/null \
@@ -143,8 +143,8 @@ jobs:
           RETRIEVER_URL: http://127.0.0.1:8001
         run: |
           nohup uv run python tests/fake_sglang_server.py >/tmp/fake-sglang.log 2>&1 &
-          nohup uv run --package faultatlas-retriever uvicorn app.main:app --host 127.0.0.1 --port 8001 >/tmp/retriever.log 2>&1 &
-          nohup uv run --package faultatlas-api uvicorn app.main:app --host 127.0.0.1 --port 8000 >/tmp/api.log 2>&1 &
+          nohup uv run --package faultatlas-retriever uvicorn app.main:app --app-dir services/retriever --host 127.0.0.1 --port 8001 >/tmp/retriever.log 2>&1 &
+          nohup uv run --package faultatlas-api uvicorn app.main:app --app-dir services/api --host 127.0.0.1 --port 8000 >/tmp/api.log 2>&1 &
           for i in $(seq 1 60); do
             if curl -sf http://127.0.0.1:8100/health >/dev/null \
               && curl -sf http://127.0.0.1:8001/health >/dev/null \
