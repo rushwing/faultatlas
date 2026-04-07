@@ -12,6 +12,7 @@ dependencies = [
     "openai>=1.30",
     "langchain-text-splitters>=0.2",
     "pypdf>=4.0",
+    "sentence-transformers>=3.0",
 ]
 
 [build-system]
